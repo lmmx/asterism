@@ -51,9 +51,9 @@ fn test_section_replacement_with_empty_lines() {
     let mut plan = EditPlan { edits: vec![edit] };
 
     match plan.apply() {
-        Ok(_) => {
+        Ok(()) => {
             let content = fs::read_to_string(&path).unwrap();
-            println!("File content after edit:\n{}", content);
+            println!("File content after edit:\n{content}");
             println!("Lines:");
             for (i, line) in content.lines().enumerate() {
                 println!("  {}: {:?}", i + 1, line);
@@ -62,11 +62,10 @@ fn test_section_replacement_with_empty_lines() {
             let lines: Vec<&str> = content.lines().collect();
             assert!(
                 lines.contains(&"Yeah"),
-                "Expected 'Yeah' in content, got: {:?}",
-                lines
+                "Expected 'Yeah' in content, got: {lines:?}"
             );
         }
-        Err(e) => panic!("Edit failed: {}", e),
+        Err(e) => panic!("Edit failed: {e}"),
     }
 }
 
@@ -93,7 +92,7 @@ fn test_boundary_mode_exclude() {
     let content = fs::read_to_string(&path).unwrap();
     let lines: Vec<&str> = content.lines().collect();
 
-    println!("Result lines: {:?}", lines);
+    println!("Result lines: {lines:?}");
 
     assert_eq!(lines[0], "A");
     assert!(lines.contains(&"REPLACED"), "Should contain replacement");
@@ -122,26 +121,25 @@ fn test_line_numbering_off_by_one() {
     let mut plan = EditPlan { edits: vec![edit] };
 
     match plan.apply() {
-        Ok(_) => {
+        Ok(()) => {
             let content = fs::read_to_string(&path).unwrap();
             let lines: Vec<&str> = content.lines().collect();
 
             println!("Lines after edit:");
             for (i, line) in lines.iter().enumerate() {
-                println!("  {}: {}", i, line);
+                println!("  {i}: {line}");
             }
 
             assert_eq!(lines[0], "First", "First line should be unchanged");
             assert!(
                 lines[1] == "SECOND" || lines.contains(&"SECOND"),
-                "Second line should be replaced with SECOND, got: {:?}",
-                lines
+                "Second line should be replaced with SECOND, got: {lines:?}"
             );
         }
         Err(e) => {
             // If it fails, that's also information about the issue
-            println!("Edit failed with error: {}", e);
-            panic!("Edit should succeed but got: {}", e);
+            println!("Edit failed with error: {e}");
+            panic!("Edit should succeed but got: {e}");
         }
     }
 }
@@ -186,7 +184,7 @@ fn test_extract_sections_line_numbers() {
         "\nSection 0 content (bytes {} to {}):",
         section.byte_start, section.byte_end
     );
-    println!("{:?}", section_text);
+    println!("{section_text:?}");
 }
 
 #[test]
@@ -213,7 +211,7 @@ fn test_line_indexing_zero_vs_one() {
     plan.apply().unwrap();
 
     let content = fs::read_to_string(&path).unwrap();
-    println!("After 0-indexed edit:\n{}", content);
+    println!("After 0-indexed edit:\n{content}");
 
     // Reset file
     writeln!(file, "Line 0\nLine 1\nLine 2\nLine 3").unwrap();
@@ -234,7 +232,7 @@ fn test_line_indexing_zero_vs_one() {
     plan2.apply().unwrap();
 
     let content2 = fs::read_to_string(&path).unwrap();
-    println!("After 1-indexed edit:\n{}", content2);
+    println!("After 1-indexed edit:\n{content2}");
 }
 
 #[test]
@@ -277,15 +275,15 @@ fn test_app_section_to_textum_conversion() {
     let mut plan = EditPlan { edits: vec![edit] };
 
     match plan.apply() {
-        Ok(_) => {
-            let content = fs::read_to_string(&path).unwrap();
-            println!("\nResult:\n{}", content);
+        Ok(()) => {
+            let content = fs::read_to_string(path).unwrap();
+            println!("\nResult:\n{content}");
 
             // Check if it worked
             assert!(content.contains("Yeah"), "Expected 'Yeah' in output");
         }
         Err(e) => {
-            panic!("Edit failed: {:?}", e);
+            panic!("Edit failed: {e:?}");
         }
     }
 }

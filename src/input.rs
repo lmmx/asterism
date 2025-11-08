@@ -152,7 +152,7 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
         let byte_start = heading.end_byte();
         let byte_end = headings
             .get(i + 1)
-            .map_or(content.len(), |h| h.start_byte());
+            .map_or(content.len(), tree_sitter::Node::start_byte);
 
         // Calculate line coordinates
         // Around line 100-110 in extract_sections
