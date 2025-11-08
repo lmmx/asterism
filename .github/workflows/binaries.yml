@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  BINARY_NAME: whichdoc
+  BINARY_NAME: asterism
   CARGO_INCREMENTAL: 0
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   CARGO_NET_RETRY: 10
@@ -73,7 +73,7 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#whichdoc-}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF_NAME#asterism-}" >> $GITHUB_OUTPUT
 
       - uses: taiki-e/upload-rust-binary-action@v1
         if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, env.BINARY_NAME)
