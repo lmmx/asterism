@@ -346,6 +346,62 @@ impl AppState {
     }
 
     #[must_use]
+    /// Finds the next descendant section at any depth in the hierarchy.
+    pub fn navigate_to_next_descendant(&self) -> Option<usize> {
+        let current = self.current_section_index;
+
+        // First try immediate children
+        if let Some(first_child) = self.sections[current].children_indices.first() {
+            return Some(*first_child);
+        }
+
+        // Otherwise, find the next section at any deeper level
+        for i in (current + 1)..self.sections.len() {
+            if self.sections[i].level > self.sections[current].level {
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
+    #[must_use]
+    /// Finds the next section at the same hierarchy level.
+    pub fn navigate_to_next_sibling(&self) -> Option<usize> {
+        let current_level = self.sections[self.current_section_index].level;
+
+        for i in (self.current_section_index + 1)..self.sections.len() {
+            if self.sections[i].level == current_level {
+                return Some(i);
+            }
+            // Stop if we've gone up a level (past our parent's siblings)
+            if self.sections[i].level < current_level {
+                break;
+            }
+        }
+
+        None
+    }
+
+    #[must_use]
+    /// Finds the previous section at the same hierarchy level.
+    pub fn navigate_to_prev_sibling(&self) -> Option<usize> {
+        let current_level = self.sections[self.current_section_index].level;
+
+        for i in (0..self.current_section_index).rev() {
+            if self.sections[i].level == current_level {
+                return Some(i);
+            }
+            // Stop if we've gone up a level
+            if self.sections[i].level < current_level {
+                break;
+            }
+        }
+
+        None
+    }
+
+    #[must_use]
     /// Calculates indentation width based on section nesting level.
     pub fn get_indent(&self) -> usize {
         if self.sections.is_empty() {

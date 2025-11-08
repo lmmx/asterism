@@ -146,13 +146,29 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Up => {
-                        if app.current_section_index > 0 {
-                            app.current_section_index -= 1;
+                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                            // Shift+Up: Jump to previous sibling at same level
+                            if let Some(prev_sibling) = app.navigate_to_prev_sibling() {
+                                app.current_section_index = prev_sibling;
+                            }
+                        } else {
+                            // Normal up: Previous section
+                            if app.current_section_index > 0 {
+                                app.current_section_index -= 1;
+                            }
                         }
                     }
                     KeyCode::Down => {
-                        if app.current_section_index < app.sections.len() - 1 {
-                            app.current_section_index += 1;
+                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                            // Shift+Down: Jump to next sibling at same level
+                            if let Some(next_sibling) = app.navigate_to_next_sibling() {
+                                app.current_section_index = next_sibling;
+                            }
+                        } else {
+                            // Normal down: Next section
+                            if app.current_section_index < app.sections.len() - 1 {
+                                app.current_section_index += 1;
+                            }
                         }
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
@@ -161,8 +177,9 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Char('l') | KeyCode::Right => {
-                        if let Some(child_idx) = app.navigate_to_first_child() {
-                            app.current_section_index = child_idx;
+                        // Try to find any descendant, not just immediate child
+                        if let Some(descendant_idx) = app.navigate_to_next_descendant() {
+                            app.current_section_index = descendant_idx;
                         }
                     }
                     KeyCode::Enter => {
