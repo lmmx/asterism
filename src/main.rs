@@ -182,6 +182,32 @@ fn run_app<B: ratatui::backend::Backend>(
                             app.current_section_index = descendant_idx;
                         }
                     }
+                    KeyCode::Home => {
+                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                            // Shift+Home: Jump to first section at same level
+                            if let Some(first_at_level) = app.navigate_to_first_at_level() {
+                                app.current_section_index = first_at_level;
+                            }
+                        } else {
+                            // Home: Jump to first section
+                            if let Some(first) = app.navigate_to_first() {
+                                app.current_section_index = first;
+                            }
+                        }
+                    }
+                    KeyCode::End => {
+                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                            // Shift+End: Jump to last section at same level
+                            if let Some(last_at_level) = app.navigate_to_last_at_level() {
+                                app.current_section_index = last_at_level;
+                            }
+                        } else {
+                            // End: Jump to last section
+                            if let Some(last) = app.navigate_to_last() {
+                                app.current_section_index = last;
+                            }
+                        }
+                    }
                     KeyCode::Enter => {
                         app.enter_detail_view();
                     }

@@ -356,13 +356,7 @@ impl AppState {
         }
 
         // Otherwise, find the next section at any deeper level
-        for i in (current + 1)..self.sections.len() {
-            if self.sections[i].level > self.sections[current].level {
-                return Some(i);
-            }
-        }
-
-        None
+        ((current + 1)..self.sections.len()).find(|&i| self.sections[i].level > self.sections[current].level)
     }
 
     #[must_use]
@@ -399,6 +393,42 @@ impl AppState {
         }
 
         None
+    }
+
+    #[must_use]
+    /// Jumps to the first section in the document.
+    pub fn navigate_to_first(&self) -> Option<usize> {
+        if self.sections.is_empty() {
+            None
+        } else {
+            Some(0)
+        }
+    }
+
+    #[must_use]
+    /// Jumps to the last section in the document.
+    pub fn navigate_to_last(&self) -> Option<usize> {
+        if self.sections.is_empty() {
+            None
+        } else {
+            Some(self.sections.len() - 1)
+        }
+    }
+
+    #[must_use]
+    /// Finds the first section at the same hierarchy level.
+    pub fn navigate_to_first_at_level(&self) -> Option<usize> {
+        let current_level = self.sections[self.current_section_index].level;
+
+        (0..self.sections.len()).find(|&i| self.sections[i].level == current_level)
+    }
+
+    #[must_use]
+    /// Finds the last section at the same hierarchy level.
+    pub fn navigate_to_last_at_level(&self) -> Option<usize> {
+        let current_level = self.sections[self.current_section_index].level;
+
+        (0..self.sections.len()).rev().find(|&i| self.sections[i].level == current_level)
     }
 
     #[must_use]
