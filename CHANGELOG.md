@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/lmmx/asterism/compare/asterism-v0.1.2...asterism-v0.1.3) - 2025-11-08
+
+### <!-- 1 -->Features
+
+- Home/End goes to first/last; Shift+Home/End is the same but on the same level
+- Shift+Up/Down preserves level; Right will go to next sub-node even of non-child elements
+
+### <!-- 4 -->Documentation
+
+- document home/end behaviour
+
 ## [0.1.2](https://github.com/lmmx/asterism/compare/asterism-v0.1.1...asterism-v0.1.2) - 2025-11-08
 
 ### <!-- 1 -->Features
