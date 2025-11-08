@@ -26,8 +26,9 @@ and [edtui][edtui] to emulate a vim editor in which to edit section content.
 ## Installation
 
 Regular cargo install or (recommended) install the pre-built binary with:
+
 ```sh
-cargo install asterism
+cargo binstall asterism
 ```
 
 ## Usage
