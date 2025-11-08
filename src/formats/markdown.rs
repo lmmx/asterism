@@ -5,6 +5,7 @@
 
 use crate::formats::Format;
 
+/// Tree-sitter queries for ATX-style markdown headings (# syntax).
 pub struct MarkdownFormat;
 
 impl Format for MarkdownFormat {

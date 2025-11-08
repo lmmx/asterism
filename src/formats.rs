@@ -6,8 +6,15 @@
 
 pub mod markdown;
 
+/// Abstracts document type differences through tree-sitter queries.
+///
+/// Enables support for markdown and other structured formats by providing format-specific parsing
+/// queries (tree-sitter uses SCM lisp queries).
 pub trait Format {
+    /// Returns the tree-sitter language parser for this format.
     fn language(&self) -> tree_sitter::Language;
+    /// Tree-sitter query matching section boundaries in this format.
     fn section_query(&self) -> &str;
+    /// Tree-sitter query extracting section titles in this format.
     fn title_query(&self) -> &str;
 }

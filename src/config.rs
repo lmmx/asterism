@@ -7,10 +7,13 @@ use facet::Facet;
 use std::fs;
 
 #[derive(Facet, Clone)]
+/// User preferences loaded from asterism.toml or falling back to defaults.
 pub struct Config {
     #[facet(default = 100)]
+    /// Maximum line width for editor text wrapping.
     pub wrap_width: usize,
     #[facet(default = vec!["md".to_string()])]
+    /// File suffixes to match when scanning directories.
     pub file_extensions: Vec<String>,
 }
 

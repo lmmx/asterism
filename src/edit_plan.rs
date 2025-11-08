@@ -9,18 +9,28 @@ use std::io;
 use textum::{Boundary, BoundaryMode, Patch, PatchSet, Snippet, Target};
 
 #[derive(Serialize, Deserialize, Clone)]
+/// Serialisable collection of file modifications for atomic application.
 pub struct EditPlan {
+    /// Individual section replacements grouped for batch processing.
     pub edits: Vec<Edit>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+/// Precise coordinates and content for replacing a section in a file.
 pub struct Edit {
+    /// Target file path for this modification.
     pub file_name: String,
+    /// First line of the section to replace (inclusive).
     pub line_start: i64,
+    /// Final line of the section to replace (exclusive).
     pub line_end: i64,
+    /// Starting column of the section header.
     pub column_start: i64,
+    /// Ending column of the section header.
     pub column_end: i64,
+    /// New content replacing the section body.
     pub doc_comment: String,
+    /// Section title for tracking and debugging edits.
     pub item_name: String,
 }
 

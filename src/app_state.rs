@@ -15,35 +15,62 @@ use std::path::PathBuf;
 use std::{fs, io};
 
 #[derive(PartialEq)]
+/// Determines navigation scope and quit behavior based on project size.
 pub enum FileMode {
+    /// Single-file mode quits directly to shell.
     Single,
+    /// Multi-file mode returns to file list before quitting.
     Multi,
 }
 
+/// Bridges document sections and the interactive editor, maintaining session state.
+///
+/// Tracks cumulative line additions to determine correct file offsets without re-parsing,
+/// enabling efficient writes after multiple edits across sections.
 pub struct AppState {
+    /// All parsed sections across loaded files.
     pub sections: Vec<Section>,
+    /// File paths available for editing in multi-file mode.
     pub files: Vec<PathBuf>,
+    /// Selected file in the file list view.
     pub current_file_index: usize,
+    /// Controls navigation behavior and file list visibility.
     pub file_mode: FileMode,
+    /// Active UI screen determining input handling.
     pub current_view: View,
+    /// Selected section in the section list.
     pub current_section_index: usize,
+    /// Editor buffer content when detail view is active.
     pub editor_state: Option<EditorState>,
+    /// Accumulates vim-style command input after ':' is pressed.
     pub command_buffer: String,
+    /// Status feedback displayed in the help bar.
     pub message: Option<String>,
+    /// Maximum line width for text wrapping in the editor.
     pub wrap_width: usize,
+    /// Tracks line count changes per section to calculate write positions without re-parsing.
     pub file_offsets: HashMap<String, HashMap<i64, usize>>,
 }
 
 #[derive(PartialEq)]
+/// Determines which UI screen renders and how input is interpreted.
 pub enum View {
+    /// Displays available files for multi-file projects.
     FileList,
+    /// Shows hierarchical section tree with navigation.
     List,
+    /// Provides vim-like editor for section content.
     Detail,
+    /// Captures vim-style command input after ':' keystroke.
     Command,
 }
 
 impl AppState {
     #[must_use]
+    /// Initialises application state with parsed sections and determines file mode.
+    ///
+    /// Single-file projects skip the file list and quit directly to shell, while multi-file
+    /// projects show a file selector and return to it on 'q'.
     pub fn new(files: Vec<PathBuf>, sections: Vec<Section>, wrap_width: usize) -> Self {
         let file_mode = if files.len() == 1 {
             FileMode::Single
@@ -84,6 +111,10 @@ impl AppState {
     }
 
     #[must_use]
+    /// Calculates total lines added before a section to determine correct write position.
+    ///
+    /// Sums line changes from all preceding sections in the same file, enabling accurate patching
+    /// without re-parsing after each edit.
     pub fn cumulative_offset(&self, index: usize) -> usize {
         let section = &self.sections[index];
         let target_file = &section.file_path;
@@ -100,6 +131,10 @@ impl AppState {
         }
     }
 
+    /// Restores previously edited content from a saved edit plan.
+    ///
+    /// Matches edits to sections by file path and line coordinates, enabling session recovery or
+    /// collaborative editing workflows.
     pub fn load_docs(&mut self, plan: EditPlan) {
         let mut doc_map: HashMap<String, Vec<String>> = HashMap::new();
         for edit in plan.edits {
@@ -137,6 +172,10 @@ impl AppState {
     }
 
     #[must_use]
+    /// Creates a serialisable plan capturing current editor modifications.
+    ///
+    /// Enables saving work-in-progress as JSON for later restoration or applying edits through
+    /// external tooling.
     pub fn generate_edit_plan(&self) -> EditPlan {
         let mut edits = Vec::new();
 
@@ -165,6 +204,10 @@ impl AppState {
         EditPlan { edits }
     }
 
+    /// Loads selected section content into the editor buffer.
+    ///
+    /// Extracts bytes between section boundaries and initialises vim-mode editing,
+    /// trimming whitespace to present clean content.
     pub fn enter_detail_view(&mut self) {
         if self.sections.is_empty() {
             return;
@@ -193,6 +236,9 @@ impl AppState {
         self.current_view = View::Detail;
     }
 
+    /// Returns to section list, optionally persisting editor changes.
+    ///
+    /// Clears editor state and transitions view without saving unless explicitly requested.
     pub fn exit_detail_view(&mut self, save: bool) {
         if save {
             // Content is saved via save_current
@@ -259,6 +305,7 @@ impl AppState {
     }
 
     #[must_use]
+    /// Returns the following section index for sequential navigation.
     pub fn find_next_section(&self) -> Option<usize> {
         if self.current_section_index + 1 < self.sections.len() {
             Some(self.current_section_index + 1)
@@ -268,6 +315,7 @@ impl AppState {
     }
 
     #[must_use]
+    /// Returns the preceding section index for reverse navigationon index for reverse navigation..
     pub fn find_prev_section(&self) -> Option<usize> {
         if self.current_section_index > 0 {
             Some(self.current_section_index - 1)
@@ -277,11 +325,13 @@ impl AppState {
     }
 
     #[must_use]
+    /// Moves to the containing section in the document hierarchy.
     pub fn navigate_to_parent(&self) -> Option<usize> {
         self.sections[self.current_section_index].parent_index
     }
 
     #[must_use]
+    /// Descends to the first child section in the document hierarchy.
     pub fn navigate_to_first_child(&self) -> Option<usize> {
         self.sections[self.current_section_index]
             .children_indices
@@ -290,6 +340,7 @@ impl AppState {
     }
 
     #[must_use]
+    /// Calculates indentation width based on section nesting level.
     pub fn get_indent(&self) -> usize {
         if self.sections.is_empty() {
             return 0;
@@ -299,6 +350,7 @@ impl AppState {
     }
 
     #[must_use]
+    /// Determines available width for text after accounting for indentation.
     pub fn get_max_line_width(&self) -> usize {
         let indent = self.get_indent();
         self.wrap_width.saturating_sub(indent)

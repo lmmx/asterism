@@ -14,6 +14,9 @@ use ratatui::{
     Frame,
 };
 
+/// Renders the active view based on current application state.
+///
+/// Dispatches to file list, section tree, or editor view according to navigation context.
 pub fn draw(f: &mut Frame, app: &mut AppState, _cfg: &Config) {
     match (&app.file_mode, &app.current_view) {
         (FileMode::Multi, View::List) if app.current_view == View::List => draw_file_list(f, app),
