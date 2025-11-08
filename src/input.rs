@@ -99,33 +99,41 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
     let title_query = Query::new(&format.language(), format.title_query())
         .map_err(|e| io::Error::other(format!("Query error: {e}")))?;
 
+    // Collect all heading nodes by traversing the entire tree
+    let mut headings: Vec<tree_sitter::Node> = Vec::new();
     let mut cursor = QueryCursor::new();
-
-    let mut sections = Vec::new();
-    let mut headings: Vec<_> = Vec::new();
     let mut matches = cursor.matches(&section_query, tree.root_node(), content.as_bytes());
+
     while let Some(m) = matches.next() {
         if let Some(c) = m.captures.first() {
             headings.push(c.node);
         }
     }
 
-    for (i, heading) in headings.iter().enumerate() {
-        // Determine level from node kind or marker count
-        let level = heading.kind().chars().filter(|c| *c == '#').count().max(
-            if heading.kind().starts_with("atx_h") {
-                heading
-                    .kind()
-                    .chars()
-                    .nth(5)
-                    .and_then(|c| c.to_digit(10))
-                    .unwrap_or(1) as usize
-            } else {
-                1
-            },
-        );
+    let mut sections = Vec::new();
 
-        // Extract title
+    for (i, heading) in headings.iter().enumerate() {
+        // Determine level from the heading marker child node
+        let mut level = 1;
+        let mut heading_cursor = heading.walk();
+        if heading_cursor.goto_first_child() {
+            loop {
+                let node = heading_cursor.node();
+                let kind = node.kind();
+                // Match atx_h1_marker, atx_h2_marker, etc.
+                if kind.starts_with("atx_h") && kind.ends_with("_marker") {
+                    if let Some(level_char) = kind.chars().nth(5) {
+                        level = level_char.to_digit(10).unwrap_or(1) as usize;
+                    }
+                    break;
+                }
+                if !heading_cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+
+        // Extract title using query
         let mut title_cursor = QueryCursor::new();
         let mut title = String::from("Untitled");
         let mut title_matches = title_cursor.matches(&title_query, *heading, content.as_bytes());
@@ -144,7 +152,7 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
         let byte_start = heading.end_byte();
         let byte_end = headings
             .get(i + 1)
-            .map_or(content.len(), tree_sitter::Node::start_byte);
+            .map_or(content.len(), |h| h.start_byte());
 
         // Calculate line coordinates
         let line_start = i64::try_from(heading.end_position().row).unwrap_or(0) + 1;

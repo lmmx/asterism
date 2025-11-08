@@ -18,6 +18,6 @@ impl Format for MarkdownFormat {
     }
 
     fn title_query(&self) -> &'static str {
-        "(atx_heading (atx_h1_marker)? (atx_h2_marker)? (atx_h3_marker)? (atx_h4_marker)? (atx_h5_marker)? (atx_h6_marker)? (inline) @title)"
+        "(atx_heading heading_content: (inline) @title)"
     }
 }
