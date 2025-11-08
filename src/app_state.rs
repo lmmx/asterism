@@ -249,6 +249,9 @@ impl AppState {
 
     /// Save the current section's content to disk.
     ///
+    /// Trim the text (no newlines at start/end) and then pad again so that
+    /// the section is always written with a single newline at either end.
+    ///
     /// # Errors
     ///
     /// Returns an error if file operations fail.
@@ -265,16 +268,19 @@ impl AppState {
             return Ok(());
         };
 
-        let content = editor_lines.join("\n");
+        // Join lines and strip leading/trailing whitespace
+        let raw_content = editor_lines.join("\n");
+        let trimmed_content = raw_content.trim();
 
-        // Create textum edit
+        let padded_content = format!("\n{}\n\n", trimmed_content);
+
         let edit = Edit {
             file_name: section.file_path.clone(),
             line_start: section.line_start,
             line_end: section.line_end,
             column_start: section.column_start,
             column_end: section.column_end,
-            doc_comment: content,
+            doc_comment: padded_content,
             item_name: section.title.clone(),
         };
 

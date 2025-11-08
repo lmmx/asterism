@@ -69,7 +69,7 @@ impl EditPlan {
                 let end = Boundary::new(Target::Line(line_end), BoundaryMode::Exclude);
                 let snippet = Snippet::Between { start, end };
 
-                let replacement = format!("\n{}\n", edit.doc_comment.trim());
+                let replacement = format!("\n{}\n\n", edit.doc_comment.trim());
 
                 let patch = Patch {
                     file: file_name.clone(),
