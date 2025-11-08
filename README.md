@@ -58,9 +58,10 @@ file_extensions = ["md", "markdown"]
 ## Keybindings
 
 ### List View
+
 - `↑`/`↓`: Navigate sections
-- `h`: Jump to parent section
-- `l`: Jump to first child section
+- `←`: Jump to parent section
+- `→`: Jump to first child section
 - `Enter`: Edit section
 - `q`: Quit (or return to file list in multi-file mode)
 
@@ -69,8 +70,8 @@ file_extensions = ["md", "markdown"]
 - `:x`: Save and exit
 - `:q`: Quit (warns if unsaved)
 - `:q!`: Force quit
-- `:wn`: Save and next undocumented
-- `:wp`: Save and previous undocumented
+- `:wn`: Save and go to next header
+- `:wp`: Save and go to previous section
 - Standard vim editing commands
 
 ## Licensing
