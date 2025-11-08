@@ -155,12 +155,12 @@ fn run_app<B: ratatui::backend::Backend>(
                             app.current_section_index += 1;
                         }
                     }
-                    KeyCode::Char('h') => {
+                    KeyCode::Char('h') | KeyCode::Left => {
                         if let Some(parent_idx) = app.navigate_to_parent() {
                             app.current_section_index = parent_idx;
                         }
                     }
-                    KeyCode::Char('l') => {
+                    KeyCode::Char('l') | KeyCode::Right => {
                         if let Some(child_idx) = app.navigate_to_first_child() {
                             app.current_section_index = child_idx;
                         }

@@ -33,18 +33,15 @@ cargo install asterism
 ## Usage
 
 Edit markdown files in the current directory:
+
 ```sh
 asterism
 ```
 
-Edit specific files:
-```sh
-asterism file1.md file2.md
-```
+Edit a specific file:
 
-Specify file extensions to match:
 ```sh
-asterism -e md -e markdown
+asterism README.md
 ```
 
 ## Configuration
