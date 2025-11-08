@@ -356,3 +356,7 @@ impl AppState {
         self.wrap_width.saturating_sub(indent)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/app_state.rs"]
+mod tests;

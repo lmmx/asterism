@@ -155,14 +155,15 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
             .map_or(content.len(), |h| h.start_byte());
 
         // Calculate line coordinates
-        let line_start = i64::try_from(heading.end_position().row).unwrap_or(0) + 1;
+        // Around line 100-110 in extract_sections
+        let line_start = i64::try_from(heading.end_position().row).unwrap_or(0);
         let line_end = headings.get(i + 1).map_or(
             i64::try_from(content.lines().count()).unwrap_or(0),
             |next| i64::try_from(next.start_position().row).unwrap_or(0),
         );
 
-        let column_start = i64::try_from(heading.start_position().column).unwrap_or(0) + 1;
-        let column_end = i64::try_from(heading.end_position().column).unwrap_or(0) + 1;
+        let column_start = i64::try_from(heading.start_position().column).unwrap_or(0);
+        let column_end = i64::try_from(heading.end_position().column).unwrap_or(0);
 
         sections.push(Section {
             title,

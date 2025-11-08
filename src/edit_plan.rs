@@ -92,3 +92,7 @@ impl EditPlan {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/edit_plan.rs"]
+mod tests;
