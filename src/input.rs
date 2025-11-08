@@ -200,3 +200,7 @@ fn build_hierarchy(sections: &mut [Section]) {
         stack.push((i, current_level));
     }
 }
+
+#[cfg(test)]
+#[path = "tests/input.rs"]
+mod tests;
