@@ -272,7 +272,7 @@ impl AppState {
         let raw_content = editor_lines.join("\n");
         let trimmed_content = raw_content.trim();
 
-        let padded_content = format!("\n{}\n\n", trimmed_content);
+        let padded_content = format!("\n{trimmed_content}\n\n");
 
         let edit = Edit {
             file_name: section.file_path.clone(),
