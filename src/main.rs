@@ -93,8 +93,7 @@ fn run_tui(mut app: app_state::AppState, cfg: &config::Config) -> io::Result<()>
         eprintln!("Error: {e}");
     } else {
         let plan = app.generate_edit_plan();
-        let json = serde_json::to_string_pretty(&plan)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(&plan).map_err(io::Error::other)?;
         println!("{json}");
     }
 
@@ -105,11 +104,11 @@ fn run_tui(mut app: app_state::AppState, cfg: &config::Config) -> io::Result<()>
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut app_state::AppState,
-    _cfg: &config::Config,
+    cfg: &config::Config,
     editor_handler: &mut EditorEventHandler,
 ) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui::draw(f, app, _cfg))?;
+        terminal.draw(|f| ui::draw(f, app, cfg))?;
 
         if let Event::Key(key) = event::read()? {
             match app.current_view {
@@ -224,10 +223,7 @@ fn run_app<B: ratatui::backend::Backend>(
                                     app.exit_detail_view(true);
                                 }
                             }
-                            "q" => {
-                                app.exit_detail_view(false);
-                            }
-                            "q!" => {
+                            "q" | "q!" => {
                                 app.exit_detail_view(false);
                             }
                             "wn" => {

@@ -43,7 +43,7 @@ impl EditPlan {
     ///
     /// # Errors
     ///
-    /// Returns an error if file operations or patching fails.
+    /// Returns an error if file operations, patching, or line number conversion fails.
     pub fn apply(&mut self) -> io::Result<()> {
         let mut file_groups: HashMap<String, Vec<&Edit>> = HashMap::new();
 
@@ -58,14 +58,15 @@ impl EditPlan {
             let mut patchset = PatchSet::new();
 
             for edit in edits {
-                let start = Boundary::new(
-                    Target::Line(edit.line_start.try_into().unwrap()),
-                    BoundaryMode::Include,
-                );
-                let end = Boundary::new(
-                    Target::Line(edit.line_end.try_into().unwrap()),
-                    BoundaryMode::Exclude,
-                );
+                let line_start: usize = edit.line_start.try_into().map_err(|_| {
+                    io::Error::other(format!("Invalid line_start: {}", edit.line_start))
+                })?;
+                let line_end: usize = edit.line_end.try_into().map_err(|_| {
+                    io::Error::other(format!("Invalid line_end: {}", edit.line_end))
+                })?;
+
+                let start = Boundary::new(Target::Line(line_start), BoundaryMode::Include);
+                let end = Boundary::new(Target::Line(line_end), BoundaryMode::Exclude);
                 let snippet = Snippet::Between { start, end };
 
                 let replacement = format!("\n{}\n", edit.doc_comment.trim());
@@ -81,7 +82,7 @@ impl EditPlan {
 
             let results = patchset
                 .apply_to_files()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| io::Error::other(e.to_string()))?;
 
             if let Some(new_content) = results.get(&file_name) {
                 std::fs::write(&file_name, new_content)?;

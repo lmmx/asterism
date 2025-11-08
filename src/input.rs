@@ -87,20 +87,19 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
     let mut parser = Parser::new();
     parser
         .set_language(&format.language())
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Language error: {e}")))?;
+        .map_err(|e| io::Error::other(format!("Language error: {e}")))?;
 
     let tree = parser
         .parse(&content, None)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Parse failed"))?;
+        .ok_or_else(|| io::Error::other("Parse failed"))?;
 
     let section_query = Query::new(&format.language(), format.section_query())
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Query error: {e}")))?;
+        .map_err(|e| io::Error::other(format!("Query error: {e}")))?;
 
     let title_query = Query::new(&format.language(), format.title_query())
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Query error: {e}")))?;
+        .map_err(|e| io::Error::other(format!("Query error: {e}")))?;
 
     let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(&section_query, tree.root_node(), content.as_bytes());
 
     let mut sections = Vec::new();
     let mut headings: Vec<_> = Vec::new();
@@ -145,7 +144,7 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
         let byte_start = heading.end_byte();
         let byte_end = headings
             .get(i + 1)
-            .map_or(content.len(), |next| next.start_byte());
+            .map_or(content.len(), tree_sitter::Node::start_byte);
 
         // Calculate line coordinates
         let line_start = i64::try_from(heading.end_position().row).unwrap_or(0) + 1;

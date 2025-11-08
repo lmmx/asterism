@@ -156,7 +156,7 @@ impl AppState {
                 "{}:{}:{}",
                 section.file_path, section.line_start, section.column_start
             );
-            if doc_map.get(&key).is_some() {
+            if doc_map.contains_key(&key) {
                 // Store the content - in a real implementation we might need a more
                 // sophisticated approach to track which sections have been edited
                 if let Ok(content) = fs::read_to_string(&section.file_path) {
