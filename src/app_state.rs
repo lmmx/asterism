@@ -356,7 +356,8 @@ impl AppState {
         }
 
         // Otherwise, find the next section at any deeper level
-        ((current + 1)..self.sections.len()).find(|&i| self.sections[i].level > self.sections[current].level)
+        ((current + 1)..self.sections.len())
+            .find(|&i| self.sections[i].level > self.sections[current].level)
     }
 
     #[must_use]
@@ -428,7 +429,9 @@ impl AppState {
     pub fn navigate_to_last_at_level(&self) -> Option<usize> {
         let current_level = self.sections[self.current_section_index].level;
 
-        (0..self.sections.len()).rev().find(|&i| self.sections[i].level == current_level)
+        (0..self.sections.len())
+            .rev()
+            .find(|&i| self.sections[i].level == current_level)
     }
 
     #[must_use]

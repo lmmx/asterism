@@ -56,19 +56,21 @@ file_extensions = ["md", "markdown"]
 
 ### List View
 
-- `↑`/`↓`: Navigate sections
-- `←`: Jump to parent section
-- `→`: Jump to first child section
-- `Enter`: Edit section
-- `q`: Quit (or return to file list in multi-file mode)
+- <kbd>↑</kbd>/<kbd>↓</kbd>: Jump to previous/next sections
+  - <kbd>Shift</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd>: Jump to previous/next section at same level
+- <kbd>←</kbd>/<kbd>→</kbd>: Jump to parent section/next descendant
+- <kbd>Home</kbd>/<kbd>End</kbd>: Jump to first/last section in document
+  - <kbd>Shift</kbd> + <kbd>Home</kbd>/<kbd>End</kbd>: Jump to first/last section at same level
+- <kbd>Enter</kbd>: Edit section
+- <kbd>q</kbd>: Quit (or return to file list in multi-file mode)
 
 ### Editor View
-- `:w`: Save
-- `:x`: Save and exit
-- `:q`: Quit (warns if unsaved)
-- `:q!`: Force quit
-- `:wn`: Save and go to next header
-- `:wp`: Save and go to previous section
+- <kbd>:w</kbd>: Save
+- <kbd>:x</kbd>: Save and exit
+- <kbd>:q</kbd>: Quit (warns if unsaved)
+- <kbd>:q!</kbd>: Force quit
+- <kbd>:wn</kbd>: Save and go to next header
+- <kbd>:wp</kbd>: Save and go to previous section
 - Standard vim editing commands
 
 ## Licensing
