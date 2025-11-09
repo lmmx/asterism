@@ -4,13 +4,13 @@
 //! The file list shows a directory tree for multi-file projects, the list view shows sections
 //! with their hierarchy, and the detail view provides a vim-like editor for section content.
 
-use crate::app_state::{AppState, FileMode, View};
+use crate::app_state::{AppState, FileMode, MoveState, View};
 use crate::config::Config;
 use crate::formats::Format;
 use edtui::{EditorTheme, EditorView, SyntaxHighlighter};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
@@ -86,23 +86,51 @@ fn draw_list(f: &mut Frame, app: &AppState) {
             spans.extend(highlighted_line.spans);
             let line = Line::from(spans);
 
-            let item = if i == app.current_section_index {
-                ListItem::new(line).style(Style::default().add_modifier(Modifier::REVERSED))
+            // Determine style based on move state
+            let style = if Some(i) == app.moving_section_index {
+                match app.move_state {
+                    MoveState::Selected => Style::default()
+                        .fg(Color::Rgb(255, 165, 0)) // Orange
+                        .add_modifier(Modifier::BOLD),
+                    MoveState::Moved => {
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                    }
+                    MoveState::None => {
+                        if i == app.current_section_index {
+                            Style::default().add_modifier(Modifier::REVERSED)
+                        } else {
+                            Style::default()
+                        }
+                    }
+                }
+            } else if i == app.current_section_index {
+                Style::default().add_modifier(Modifier::REVERSED)
             } else {
-                ListItem::new(line)
+                Style::default()
             };
 
-            item
+            ListItem::new(line).style(style)
         })
         .collect();
 
-    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sections"));
+    let title = if app.move_state == MoveState::None {
+        "Sections"
+    } else {
+        "Sections (MOVING)"
+    };
+
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title(title));
 
     f.render_widget(list, chunks[0]);
 
-    let help = Paragraph::new("↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | q: Quit")
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(help, chunks[1]);
+    let help = if app.move_state == MoveState::None {
+        "↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | Ctrl+↑: Start Move | q: Quit"
+    } else {
+        "Ctrl+↑/↓: Move | Ctrl+←/→: Level | Ctrl+Home/End: Top/Bottom | :w Save | Esc: Cancel"
+    };
+
+    let help_widget = Paragraph::new(help).block(Block::default().borders(Borders::ALL));
+    f.render_widget(help_widget, chunks[1]);
 }
 
 fn draw_detail(f: &mut Frame, app: &mut AppState) {

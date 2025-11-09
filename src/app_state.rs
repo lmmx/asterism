@@ -23,6 +23,88 @@ pub enum FileMode {
     Multi,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+/// Tracks the lifecycle of a section reordering operation.
+///
+/// Section moves proceed through distinct states to provide visual feedback and prevent
+/// accidental modifications. The state machine is:
+///
+/// ```text
+/// None -> Selected -> Moved -> None (after save or cancel)
+///        ^ |
+///        |____________________|
+///              (cancel)
+/// ```
+///
+/// # Visual Feedback
+///
+/// Each state has a corresponding visual style in the section list:
+/// - `None`: Normal rendering (selected section uses reversed style)
+/// - `Selected`: Orange text with bold modifier (indicates Ctrl key held)
+/// - `Moved`: Red text with bold modifier (indicates unsaved changes)
+///
+/// # State Transitions
+///
+/// - **None → Selected**: Triggered by `Ctrl+↑` on a section
+/// - **Selected → Moved**: Any move operation (up/down/level change)
+/// - **Moved → None**: Successful save (`:w`) or cancel (`Esc`)
+/// - **Selected → None**: Cancel before any moves
+pub enum MoveState {
+    /// No section is being moved; normal navigation mode.
+    ///
+    /// In this state, all keybindings operate in their default navigation mode:
+    /// - `↑/↓` move the cursor between sections
+    /// - `←/→` navigate parent/child relationships
+    /// - `Ctrl+↑` initiates a move operation
+    ///
+    /// This is the default state and the state returned to after save or cancel.
+    None,
+    /// A section has been selected for moving but no changes made yet.
+    ///
+    /// Triggered by pressing `Ctrl+↑` while in the `None` state. The selected section
+    /// displays in orange to indicate it's ready to be repositioned. In this state:
+    /// - `Ctrl+↑/↓` move the section up or down
+    /// - `Ctrl+←/→` change the section's heading level
+    /// - `Ctrl+Home/End` move the section to top or bottom
+    /// - `Esc` cancels the operation without changes
+    ///
+    /// The first move operation transitions to `Moved` state.
+    ///
+    /// # Example
+    ///
+    /// ```text
+    /// # Introduction <- normal
+    /// ## Background <- SELECTED (orange, after Ctrl+↑)
+    /// ## Methods <- normal
+    Selected,
+    /// Section has been repositioned but changes not yet persisted to disk.
+    ///
+    /// After any move operation (position or level change), the section enters this state
+    /// and displays in red to indicate unsaved modifications. The move can still be:
+    /// - Refined with additional `Ctrl+arrow` operations
+    /// - Saved with `:w` (writes new structure to disk, returns to `None`)
+    /// - Cancelled with `Esc` (reverts all changes, returns to `None`)
+    ///
+    /// Multiple moves can be made before saving, allowing the user to position the section
+    /// precisely before committing to disk.
+    ///
+    /// # Example
+    ///
+    /// ```text
+    /// ## Background <- MOVED (red, after Ctrl+↑ from position 2)
+    /// # Introduction <- normal (was above, now below)
+    /// ## Methods <- normal
+    /// ```
+    ///
+    /// # Persistence
+    ///
+    /// When saved, the entire file is rewritten with sections in their new order and with
+    /// updated heading levels. The rewrite preserves section content but regenerates the
+    /// document structure. After save, sections are re-parsed from disk to ensure
+    /// byte positions and line numbers are accurate.
+    Moved,
+}
+
 /// Bridges document sections and the interactive editor, maintaining session state.
 ///
 /// Tracks cumulative line additions to determine correct file offsets without re-parsing,
@@ -50,6 +132,10 @@ pub struct AppState {
     pub wrap_width: usize,
     /// Tracks line count changes per section to calculate write positions without re-parsing.
     pub file_offsets: HashMap<String, HashMap<i64, usize>>,
+    /// Tracks section being moved for visual feedback
+    pub move_state: MoveState,
+    /// Index of section being moved (if any)
+    pub moving_section_index: Option<usize>,
 }
 
 #[derive(PartialEq)]
@@ -90,6 +176,8 @@ impl AppState {
             message: None,
             wrap_width,
             file_offsets: HashMap::new(),
+            move_state: MoveState::None,
+            moving_section_index: None,
         }
     }
 
@@ -472,6 +560,185 @@ impl AppState {
         let indent = self.get_indent();
         self.wrap_width.saturating_sub(indent)
     }
+
+    // --- Section List Movement ---
+
+    /// Start moving the current section
+    pub fn start_move(&mut self) {
+        self.moving_section_index = Some(self.current_section_index);
+        self.move_state = MoveState::Selected;
+    }
+
+    /// Cancel the current move operation
+    pub fn cancel_move(&mut self) {
+        self.moving_section_index = None;
+        self.move_state = MoveState::None;
+    }
+
+    /// Mark section as moved but not yet saved
+    pub fn mark_moved(&mut self) {
+        self.move_state = MoveState::Moved;
+    }
+
+    /// Move section up by one position
+    pub fn move_section_up(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            if moving_idx > 0 {
+                self.sections.swap(moving_idx, moving_idx - 1);
+                self.moving_section_index = Some(moving_idx - 1);
+                self.current_section_index = moving_idx - 1;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Move section down by one position
+    pub fn move_section_down(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            if moving_idx < self.sections.len() - 1 {
+                self.sections.swap(moving_idx, moving_idx + 1);
+                self.moving_section_index = Some(moving_idx + 1);
+                self.current_section_index = moving_idx + 1;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Move section to top of document
+    pub fn move_section_to_top(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            if moving_idx > 0 {
+                let section = self.sections.remove(moving_idx);
+                self.sections.insert(0, section);
+                self.moving_section_index = Some(0);
+                self.current_section_index = 0;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Move section to bottom of document
+    pub fn move_section_to_bottom(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            let last_idx = self.sections.len() - 1;
+            if moving_idx < last_idx {
+                let section = self.sections.remove(moving_idx);
+                self.sections.push(section);
+                self.moving_section_index = Some(last_idx);
+                self.current_section_index = last_idx;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Increase section level (move in - lower level number)
+    pub fn move_section_in(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            if self.sections[moving_idx].level > 1 {
+                self.sections[moving_idx].level -= 1;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Decrease section level (move out - higher level number)
+    pub fn move_section_out(&mut self) -> bool {
+        if let Some(moving_idx) = self.moving_section_index {
+            if self.sections[moving_idx].level < 6 {
+                self.sections[moving_idx].level += 1;
+                self.mark_moved();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Apply section reordering to disk
+    pub fn save_section_reorder(&mut self) -> io::Result<()> {
+        if self.move_state != MoveState::Moved {
+            return Ok(());
+        }
+
+        // Group sections by file
+        let mut file_sections: HashMap<String, Vec<&Section>> = HashMap::new();
+        for section in &self.sections {
+            file_sections
+                .entry(section.file_path.clone())
+                .or_default()
+                .push(section);
+        }
+
+        // Process each file
+        for (file_path, sections) in file_sections {
+            self.rewrite_file_sections(&file_path, sections)?;
+        }
+
+        // Reload sections to get updated positions
+        let format = MarkdownFormat;
+        let mut new_sections = Vec::new();
+        for file in &self.files {
+            if let Ok(secs) = input::extract_sections(file, &format) {
+                new_sections.extend(secs);
+            }
+        }
+
+        self.sections = new_sections;
+        self.cancel_move();
+        self.message = Some("Sections reordered".to_string());
+
+        Ok(())
+    }
+
+    /// Rewrite an entire file with reordered sections
+    fn rewrite_file_sections(&self, file_path: &str, sections: Vec<&Section>) -> io::Result<()> {
+        let content = fs::read_to_string(file_path)?;
+        let mut new_content = String::new();
+
+        // Extract section content for each section
+        let mut section_contents: Vec<(usize, String, String)> = Vec::new();
+        for section in &sections {
+            let heading_prefix = "#".repeat(section.level);
+            let heading = format!("{} {}", heading_prefix, section.title);
+
+            let bytes = content.as_bytes();
+            let section_text =
+                if section.byte_start < bytes.len() && section.byte_end <= bytes.len() {
+                    String::from_utf8_lossy(&bytes[section.byte_start..section.byte_end])
+                        .to_string()
+                        .trim()
+                        .to_string()
+                } else {
+                    String::new()
+                };
+
+            section_contents.push((section.level, heading, section_text));
+        }
+
+        // Write sections in new order
+        for (i, (level, heading, content)) in section_contents.iter().enumerate() {
+            new_content.push_str(heading);
+            new_content.push_str("\n\n");
+            if !content.is_empty() {
+                new_content.push_str(content);
+                new_content.push_str("\n\n");
+            }
+        }
+
+        fs::write(file_path, new_content)?;
+        Ok(())
+    }
+
+    // --- </Section List Movement> ---
 }
 
 #[cfg(test)]

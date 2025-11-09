@@ -146,7 +146,14 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Up => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Up: Start move or move up
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
+                                app.move_section_up();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Up: Jump to previous sibling at same level
                             if let Some(prev_sibling) = app.navigate_to_prev_sibling() {
                                 app.current_section_index = prev_sibling;
@@ -159,7 +166,12 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Down => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Down: Move down
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_down();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Down: Jump to next sibling at same level
                             if let Some(next_sibling) = app.navigate_to_next_sibling() {
                                 app.current_section_index = next_sibling;
@@ -171,19 +183,33 @@ fn run_app<B: ratatui::backend::Backend>(
                             }
                         }
                     }
-                    KeyCode::Char('h') | KeyCode::Left => {
-                        if let Some(parent_idx) = app.navigate_to_parent() {
+                    KeyCode::Left => {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Left: Decrease level (move out)
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_out();
+                            }
+                        } else if let Some(parent_idx) = app.navigate_to_parent() {
                             app.current_section_index = parent_idx;
                         }
                     }
-                    KeyCode::Char('l') | KeyCode::Right => {
-                        // Try to find any descendant, not just immediate child
-                        if let Some(descendant_idx) = app.navigate_to_next_descendant() {
+                    KeyCode::Right => {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Right: Increase level (move in)
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_in();
+                            }
+                        } else if let Some(descendant_idx) = app.navigate_to_next_descendant() {
                             app.current_section_index = descendant_idx;
                         }
                     }
                     KeyCode::Home => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Home: Move to top
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_to_top();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Home: Jump to first section at same level
                             if let Some(first_at_level) = app.navigate_to_first_at_level() {
                                 app.current_section_index = first_at_level;
@@ -196,7 +222,12 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::End => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+End: Move to bottom
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_to_bottom();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+End: Jump to last section at same level
                             if let Some(last_at_level) = app.navigate_to_last_at_level() {
                                 app.current_section_index = last_at_level;
@@ -208,8 +239,17 @@ fn run_app<B: ratatui::backend::Backend>(
                             }
                         }
                     }
-                    KeyCode::Enter => {
-                        app.enter_detail_view();
+                    KeyCode::Esc => {
+                        if app.move_state != app_state::MoveState::None {
+                            app.cancel_move();
+                        }
+                    }
+                    KeyCode::Char(':') => {
+                        if app.move_state != app_state::MoveState::None {
+                            app.current_view = app_state::View::Command;
+                            app.command_buffer.clear();
+                            app.message = None;
+                        }
                     }
                     _ => {}
                 },
@@ -255,7 +295,11 @@ fn run_app<B: ratatui::backend::Backend>(
 
                         match cmd.as_str() {
                             "w" => {
-                                if let Err(e) = app.save_current() {
+                                if app.move_state == app_state::MoveState::Moved {
+                                    if let Err(e) = app.save_section_reorder() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else if let Err(e) = app.save_current() {
                                     app.message = Some(format!("Error saving: {e}"));
                                 }
                             }
