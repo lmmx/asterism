@@ -33,3 +33,69 @@ pub struct Section {
     /// Edited content for this section (if modified)
     pub doc_comment: Option<Vec<String>>,
 }
+
+#[derive(Clone)]
+/// Types of nodes that can appear in the file tree view.
+pub enum NodeType {
+    /// Directory node showing a path component
+    Directory {
+        /// Directory name (not full path)
+        name: String,
+        /// Full path for reference
+        path: String,
+    },
+    /// File node (non-navigable, just shows filename)
+    File {
+        /// File name
+        name: String,
+        /// Full path for reference
+        path: String,
+    },
+    /// Actual document section (navigable)
+    Section(Section),
+}
+
+#[derive(Clone)]
+/// A node in the unified file + section tree.
+pub struct TreeNode {
+    /// The type of node (directory, file, or section)
+    pub node_type: NodeType,
+    /// Nesting level in the tree (for indentation/box-drawing)
+    pub tree_level: usize,
+    /// Whether this node can be selected and edited
+    pub navigable: bool,
+    /// Index of the actual section if this is a Section node
+    pub section_index: Option<usize>,
+}
+
+impl TreeNode {
+    /// Create a directory node
+    pub fn directory(name: String, path: String, tree_level: usize) -> Self {
+        Self {
+            node_type: NodeType::Directory { name, path },
+            tree_level,
+            navigable: false,
+            section_index: None,
+        }
+    }
+
+    /// Create a file node
+    pub fn file(name: String, path: String, tree_level: usize) -> Self {
+        Self {
+            node_type: NodeType::File { name, path },
+            tree_level,
+            navigable: false,
+            section_index: None,
+        }
+    }
+
+    /// Create a section node
+    pub fn section(section: Section, tree_level: usize, section_index: usize) -> Self {
+        Self {
+            node_type: NodeType::Section(section),
+            tree_level,
+            navigable: true,
+            section_index: Some(section_index),
+        }
+    }
+}

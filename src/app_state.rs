@@ -8,10 +8,10 @@
 use crate::edit_plan::{Edit, EditPlan};
 use crate::formats::markdown::MarkdownFormat;
 use crate::input;
-use crate::section::Section;
+use crate::section::{NodeType, Section, TreeNode};
 use edtui::{EditorState, Lines};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 #[derive(PartialEq)]
@@ -19,109 +19,35 @@ use std::{fs, io};
 pub enum FileMode {
     /// Single-file mode quits directly to shell.
     Single,
-    /// Multi-file mode returns to file list before quitting.
+    /// Multi-file mode shows file tree in list view.
     Multi,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 /// Tracks the lifecycle of a section reordering operation.
-///
-/// Section moves proceed through distinct states to provide visual feedback and prevent
-/// accidental modifications. The state machine is:
-///
-/// ```text
-/// None -> Selected -> Moved -> None (after save or cancel)
-///        ^ |
-///        |____________________|
-///              (cancel)
-/// ```
-///
-/// # Visual Feedback
-///
-/// Each state has a corresponding visual style in the section list:
-/// - `None`: Normal rendering (selected section uses reversed style)
-/// - `Selected`: Orange text with bold modifier (indicates Ctrl key held)
-/// - `Moved`: Red text with bold modifier (indicates unsaved changes)
-///
-/// # State Transitions
-///
-/// - **None → Selected**: Triggered by `Ctrl+↑/↓/←/→` on a section
-/// - **Selected → Moved**: Any move operation (up/down/level change)
-/// - **Moved → None**: Successful save (`:w`) or cancel (`Esc`)
-/// - **Selected → None**: Cancel before any moves
 pub enum MoveState {
     /// No section is being moved; normal navigation mode.
-    ///
-    /// In this state, all keybindings operate in their default navigation mode:
-    /// - `↑/↓` move the cursor between sections
-    /// - `←/→` navigate parent/child relationships
-    /// - `Ctrl+↑/↓/←/→` initiates a move operation
-    ///
-    /// This is the default state and the state returned to after save or cancel.
     None,
     /// A section has been selected for moving but no changes made yet.
-    ///
-    /// Triggered by pressing `Ctrl+↑/↓/←/→` while in the `None` state. The selected section
-    /// displays in orange to indicate it's ready to be repositioned. In this state:
-    /// - `Ctrl+↑/↓` move the section up or down
-    /// - `Ctrl+←/→` change the section's heading level
-    /// - `Ctrl+Home/End` move the section to top or bottom
-    /// - `Esc` cancels the operation without changes
-    ///
-    /// The first move operation transitions to `Moved` state.
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// # Introduction <- normal
-    /// ## Background <- SELECTED (orange, after Ctrl+↑/↓)
-    /// ## Methods <- normal
     Selected,
     /// Section has been repositioned but changes not yet persisted to disk.
-    ///
-    /// After any move operation (position or level change), the section enters this state
-    /// and displays in red to indicate unsaved modifications. The move can still be:
-    /// - Refined with additional `Ctrl+arrow` operations
-    /// - Saved with `:w` (writes new structure to disk, returns to `None`)
-    /// - Cancelled with `Esc` (reverts all changes, returns to `None`)
-    ///
-    /// Multiple moves can be made before saving, allowing the user to position the section
-    /// precisely before committing to disk.
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// ## Background <- MOVED (red, after Ctrl+↑/↓/←/→ from position 2)
-    /// # Introduction <- normal (was above, now below)
-    /// ## Methods <- normal
-    /// ```
-    ///
-    /// # Persistence
-    ///
-    /// When saved, the entire file is rewritten with sections in their new order and with
-    /// updated heading levels. The rewrite preserves section content but regenerates the
-    /// document structure. After save, sections are re-parsed from disk to ensure
-    /// byte positions and line numbers are accurate.
     Moved,
 }
 
 /// Bridges document sections and the interactive editor, maintaining session state.
-///
-/// Tracks cumulative line additions to determine correct file offsets without re-parsing,
-/// enabling efficient writes after multiple edits across sections.
 pub struct AppState {
     /// All parsed sections across loaded files.
     pub sections: Vec<Section>,
-    /// File paths available for editing in multi-file mode.
+    /// Unified tree of directories, files, and sections for display
+    pub tree_nodes: Vec<TreeNode>,
+    /// File paths available for editing.
     pub files: Vec<PathBuf>,
-    /// Selected file in the file list view.
-    pub current_file_index: usize,
-    /// Controls navigation behavior and file list visibility.
+    /// Controls navigation behavior and file tree visibility.
     pub file_mode: FileMode,
     /// Active UI screen determining input handling.
     pub current_view: View,
-    /// Selected section in the section list.
-    pub current_section_index: usize,
+    /// Selected node index in the tree
+    pub current_node_index: usize,
     /// Editor buffer content when detail view is active.
     pub editor_state: Option<EditorState>,
     /// Accumulates vim-style command input after ':' is pressed.
@@ -141,8 +67,6 @@ pub struct AppState {
 #[derive(PartialEq)]
 /// Determines which UI screen renders and how input is interpreted.
 pub enum View {
-    /// Displays available files for multi-file projects.
-    FileList,
     /// Shows hierarchical section tree with navigation.
     List,
     /// Provides vim-like editor for section content.
@@ -154,9 +78,6 @@ pub enum View {
 impl AppState {
     #[must_use]
     /// Initialises application state with parsed sections and determines file mode.
-    ///
-    /// Single-file projects skip the file list and quit directly to shell, while multi-file
-    /// projects show a file selector and return to it on 'q'.
     pub fn new(files: Vec<PathBuf>, sections: Vec<Section>, wrap_width: usize) -> Self {
         let file_mode = if files.len() == 1 {
             FileMode::Single
@@ -164,13 +85,15 @@ impl AppState {
             FileMode::Multi
         };
 
+        let tree_nodes = Self::build_tree(&files, &sections);
+
         Self {
             sections,
+            tree_nodes,
             files,
-            current_file_index: 0,
             file_mode,
             current_view: View::List,
-            current_section_index: 0,
+            current_node_index: 0,
             editor_state: None,
             command_buffer: String::new(),
             message: None,
@@ -181,11 +104,104 @@ impl AppState {
         }
     }
 
+    /// Build the unified tree structure from files and sections
+    fn build_tree(files: &[PathBuf], sections: &[Section]) -> Vec<TreeNode> {
+        let mut nodes = Vec::new();
+
+        if files.len() == 1 {
+            // Single file mode: just show sections with their heading hierarchy
+            for (idx, section) in sections.iter().enumerate() {
+                nodes.push(TreeNode::section(
+                    section.clone(),
+                    section.level - 1, // Convert heading level to tree level
+                    idx,
+                ));
+            }
+        } else {
+            // Multi-file mode: build directory tree with sections nested under files
+            let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
+
+            // Group sections by file
+            for (idx, section) in sections.iter().enumerate() {
+                file_tree
+                    .entry(section.file_path.clone())
+                    .or_default()
+                    .push((idx, section));
+            }
+
+            // Build tree with directory structure
+            let mut sorted_files: Vec<_> = files.iter().collect();
+            sorted_files.sort();
+
+            for file_path in sorted_files {
+                let path_str = file_path.to_string_lossy().to_string();
+
+                // Add file node (non-navigable)
+                let file_name = file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path_str.clone());
+
+                nodes.push(TreeNode::file(file_name, path_str.clone(), 0));
+
+                // Add sections under this file
+                if let Some(file_sections) = file_tree.get(&path_str) {
+                    for (idx, section) in file_sections {
+                        // Section tree level = 1 (under file) + heading level - 1
+                        let tree_level = section.level;
+                        nodes.push(TreeNode::section(section.clone(), tree_level, *idx));
+                    }
+                }
+            }
+        }
+
+        // Ensure we start on a navigable node
+        if let Some(first_navigable) = nodes.iter().position(|n| n.navigable) {
+            if first_navigable > 0 {
+                // Move first navigable to start if not already there
+                // Actually, keep tree structure but navigation will skip
+            }
+        }
+
+        nodes
+    }
+
+    /// Rebuild tree after sections change (e.g., after save)
+    pub fn rebuild_tree(&mut self) {
+        self.tree_nodes = Self::build_tree(&self.files, &self.sections);
+
+        // Try to maintain current position by finding same section
+        if let Some(current_section_idx) = self.get_current_section_index() {
+            if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                n.section_index == Some(current_section_idx)
+            }) {
+                self.current_node_index = node_idx;
+            }
+        }
+    }
+
+    /// Get the section index for the currently selected node (if it's a section)
+    #[must_use]
+    pub fn get_current_section_index(&self) -> Option<usize> {
+        if self.current_node_index < self.tree_nodes.len() {
+            self.tree_nodes[self.current_node_index].section_index
+        } else {
+            None
+        }
+    }
+
+    /// Get the current section (if on a section node)
+    #[must_use]
+    pub fn get_current_section(&self) -> Option<&Section> {
+        self.get_current_section_index()
+            .and_then(|idx| self.sections.get(idx))
+    }
+
     fn rebuild_file_offsets(&mut self) {
         self.file_offsets.clear();
 
-        for (i, section) in self.sections.iter().enumerate() {
-            if i == self.current_section_index {
+        if let Some(section_idx) = self.get_current_section_index() {
+            if let Some(section) = self.sections.get(section_idx) {
                 let lines_added = self.editor_state.as_ref().map_or(0, |es| es.lines.len());
 
                 let file_map = self
@@ -200,9 +216,6 @@ impl AppState {
 
     #[must_use]
     /// Calculates total lines added before a section to determine correct write position.
-    ///
-    /// Sums line changes from all preceding sections in the same file, enabling accurate patching
-    /// without re-parsing after each edit.
     pub fn cumulative_offset(&self, index: usize) -> usize {
         let section = &self.sections[index];
         let target_file = &section.file_path;
@@ -220,9 +233,6 @@ impl AppState {
     }
 
     /// Restores previously edited content from a saved edit plan.
-    ///
-    /// Matches edits to sections by file path and line coordinates, enabling session recovery or
-    /// collaborative editing workflows.
     pub fn load_docs(&mut self, plan: EditPlan) {
         let mut doc_map: HashMap<String, Vec<String>> = HashMap::new();
         for edit in plan.edits {
@@ -245,14 +255,10 @@ impl AppState {
                 section.file_path, section.line_start, section.column_start
             );
             if doc_map.contains_key(&key) {
-                // Store the content - in a real implementation we might need a more
-                // sophisticated approach to track which sections have been edited
                 if let Ok(content) = fs::read_to_string(&section.file_path) {
                     let bytes = content.as_bytes();
                     if section.byte_start < bytes.len() && section.byte_end <= bytes.len() {
                         // Section exists and can be loaded
-                        // The doc_lines represent previously edited content
-                        // This would need to be applied or tracked somehow
                     }
                 }
             }
@@ -261,13 +267,9 @@ impl AppState {
 
     #[must_use]
     /// Creates a serialisable plan capturing current editor modifications.
-    ///
-    /// Enables saving work-in-progress as JSON for later restoration or applying edits through
-    /// external tooling.
     pub fn generate_edit_plan(&self) -> EditPlan {
         let mut edits = Vec::new();
 
-        // Generate edits from ALL modified sections
         for section in &self.sections {
             if let Some(ref doc_lines) = section.doc_comment {
                 let doc_comment = doc_lines.join("\n");
@@ -288,17 +290,13 @@ impl AppState {
     }
 
     /// Loads selected section content into the editor buffer.
-    ///
-    /// Extracts bytes between section boundaries and initialises vim-mode editing,
-    /// trimming whitespace to present clean content.
     pub fn enter_detail_view(&mut self) {
-        if self.sections.is_empty() {
+        let Some(section_idx) = self.get_current_section_index() else {
             return;
-        }
+        };
 
-        let section = &self.sections[self.current_section_index];
+        let section = &self.sections[section_idx];
 
-        // Read file content
         if let Ok(content) = fs::read_to_string(&section.file_path) {
             let bytes = content.as_bytes();
             let section_bytes =
@@ -320,18 +318,17 @@ impl AppState {
     }
 
     /// Returns to section list, optionally persisting editor changes.
-    ///
-    /// Clears editor state and transitions view without saving unless explicitly requested.
     pub fn exit_detail_view(&mut self, save: bool) {
         if save {
-            // Extract text from editor and store in section
             if let Some(ref editor_state) = self.editor_state {
-                let lines = editor_state
-                    .lines
-                    .iter_row()
-                    .map(|line| line.iter().collect::<String>())
-                    .collect();
-                self.sections[self.current_section_index].doc_comment = Some(lines);
+                if let Some(section_idx) = self.get_current_section_index() {
+                    let lines = editor_state
+                        .lines
+                        .iter_row()
+                        .map(|line| line.iter().collect::<String>())
+                        .collect();
+                    self.sections[section_idx].doc_comment = Some(lines);
+                }
             }
         }
         self.editor_state = None;
@@ -339,15 +336,7 @@ impl AppState {
     }
 
     /// Save the current section's content to disk.
-    ///
-    /// Trim the text (no newlines at start/end) and then pad again so that
-    /// the section is always written with a single newline at either end.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if file operations fail.
     pub fn save_current(&mut self) -> io::Result<()> {
-        // Extract editor lines first, before any borrows
         let editor_lines = if let Some(ref editor_state) = self.editor_state {
             editor_state
                 .lines
@@ -358,16 +347,16 @@ impl AppState {
             return Ok(());
         };
 
-        // Store in section for edit plan generation
-        self.sections[self.current_section_index].doc_comment = Some(editor_lines.clone());
+        let Some(section_idx) = self.get_current_section_index() else {
+            return Ok(());
+        };
 
-        // Now borrow section data
-        let section = &self.sections[self.current_section_index];
+        self.sections[section_idx].doc_comment = Some(editor_lines.clone());
 
-        // Join lines and strip leading/trailing whitespace
+        let section = &self.sections[section_idx];
+
         let raw_content = editor_lines.join("\n");
         let trimmed_content = raw_content.trim();
-
         let padded_content = format!("\n{trimmed_content}\n\n");
 
         let edit = Edit {
@@ -388,30 +377,31 @@ impl AppState {
         if let Ok(new_sections) =
             input::extract_sections(&PathBuf::from(&section.file_path), &format)
         {
-            // Find matching section by title and level BEFORE modifying sections
             let target_title = section.title.clone();
             let target_level = section.level;
 
-            // Remove old sections from this file
             let file_path = section.file_path.clone();
             self.sections.retain(|s| s.file_path != file_path);
 
-            // Find the index in new_sections
             if let Some(local_index) = new_sections
                 .iter()
                 .position(|s| s.title == target_title && s.level == target_level)
             {
-                // Calculate what the new global index will be after extending
                 let new_global_index = self.sections.len() + local_index;
-
-                // Now extend with new sections
                 self.sections.extend(new_sections);
 
-                // Set to the correct global index
-                self.current_section_index = new_global_index;
+                // Rebuild tree and find the updated section
+                self.rebuild_tree();
+
+                // Find node with this section index
+                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(new_global_index)
+                }) {
+                    self.current_node_index = node_idx;
+                }
             } else {
-                // If we can't find it, just extend and stay at current position
                 self.sections.extend(new_sections);
+                self.rebuild_tree();
             }
         }
 
@@ -420,66 +410,87 @@ impl AppState {
         Ok(())
     }
 
+    /// Navigate to next navigable node
     #[must_use]
-    /// Returns the following section index for sequential navigation.
-    pub fn find_next_section(&self) -> Option<usize> {
-        if self.current_section_index + 1 < self.sections.len() {
-            Some(self.current_section_index + 1)
-        } else {
-            None
+    pub fn find_next_node(&self) -> Option<usize> {
+        for i in (self.current_node_index + 1)..self.tree_nodes.len() {
+            if self.tree_nodes[i].navigable {
+                return Some(i);
+            }
         }
+        None
     }
 
+    /// Navigate to previous navigable node
     #[must_use]
-    /// Returns the preceding section index for reverse navigationon index for reverse navigation..
-    pub fn find_prev_section(&self) -> Option<usize> {
-        if self.current_section_index > 0 {
-            Some(self.current_section_index - 1)
-        } else {
-            None
+    pub fn find_prev_node(&self) -> Option<usize> {
+        for i in (0..self.current_node_index).rev() {
+            if self.tree_nodes[i].navigable {
+                return Some(i);
+            }
         }
+        None
     }
 
     #[must_use]
     /// Moves to the containing section in the document hierarchy.
     pub fn navigate_to_parent(&self) -> Option<usize> {
-        self.sections[self.current_section_index].parent_index
+        let section_idx = self.get_current_section_index()?;
+        let parent_section_idx = self.sections[section_idx].parent_index?;
+
+        // Find tree node with this section index
+        self.tree_nodes.iter().position(|n| {
+            n.section_index == Some(parent_section_idx)
+        })
     }
 
     #[must_use]
     /// Descends to the first child section in the document hierarchy.
     pub fn navigate_to_first_child(&self) -> Option<usize> {
-        self.sections[self.current_section_index]
-            .children_indices
-            .first()
-            .copied()
+        let section_idx = self.get_current_section_index()?;
+        let first_child_idx = self.sections[section_idx].children_indices.first()?;
+
+        self.tree_nodes.iter().position(|n| {
+            n.section_index == Some(*first_child_idx)
+        })
     }
 
     #[must_use]
     /// Finds the next descendant section at any depth in the hierarchy.
     pub fn navigate_to_next_descendant(&self) -> Option<usize> {
-        let current = self.current_section_index;
+        let section_idx = self.get_current_section_index()?;
 
         // First try immediate children
-        if let Some(first_child) = self.sections[current].children_indices.first() {
-            return Some(*first_child);
+        if let Some(first_child) = self.sections[section_idx].children_indices.first() {
+            return self.tree_nodes.iter().position(|n| {
+                n.section_index == Some(*first_child)
+            });
         }
 
-        // Otherwise, find the next section at any deeper level
-        ((current + 1)..self.sections.len())
-            .find(|&i| self.sections[i].level > self.sections[current].level)
+        // Otherwise find next section at deeper level
+        for i in (section_idx + 1)..self.sections.len() {
+            if self.sections[i].level > self.sections[section_idx].level {
+                return self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(i)
+                });
+            }
+        }
+
+        None
     }
 
     #[must_use]
     /// Finds the next section at the same hierarchy level.
     pub fn navigate_to_next_sibling(&self) -> Option<usize> {
-        let current_level = self.sections[self.current_section_index].level;
+        let section_idx = self.get_current_section_index()?;
+        let current_level = self.sections[section_idx].level;
 
-        for i in (self.current_section_index + 1)..self.sections.len() {
+        for i in (section_idx + 1)..self.sections.len() {
             if self.sections[i].level == current_level {
-                return Some(i);
+                return self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(i)
+                });
             }
-            // Stop if we've gone up a level (past our parent's siblings)
             if self.sections[i].level < current_level {
                 break;
             }
@@ -491,13 +502,15 @@ impl AppState {
     #[must_use]
     /// Finds the previous section at the same hierarchy level.
     pub fn navigate_to_prev_sibling(&self) -> Option<usize> {
-        let current_level = self.sections[self.current_section_index].level;
+        let section_idx = self.get_current_section_index()?;
+        let current_level = self.sections[section_idx].level;
 
-        for i in (0..self.current_section_index).rev() {
+        for i in (0..section_idx).rev() {
             if self.sections[i].level == current_level {
-                return Some(i);
+                return self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(i)
+                });
             }
-            // Stop if we've gone up a level
             if self.sections[i].level < current_level {
                 break;
             }
@@ -507,51 +520,59 @@ impl AppState {
     }
 
     #[must_use]
-    /// Jumps to the first section in the document.
+    /// Jumps to the first navigable node.
     pub fn navigate_to_first(&self) -> Option<usize> {
-        if self.sections.is_empty() {
-            None
-        } else {
-            Some(0)
-        }
+        self.tree_nodes.iter().position(|n| n.navigable)
     }
 
     #[must_use]
-    /// Jumps to the last section in the document.
+    /// Jumps to the last navigable node.
     pub fn navigate_to_last(&self) -> Option<usize> {
-        if self.sections.is_empty() {
-            None
-        } else {
-            Some(self.sections.len() - 1)
-        }
+        self.tree_nodes.iter().rposition(|n| n.navigable)
     }
 
     #[must_use]
     /// Finds the first section at the same hierarchy level.
     pub fn navigate_to_first_at_level(&self) -> Option<usize> {
-        let current_level = self.sections[self.current_section_index].level;
+        let section_idx = self.get_current_section_index()?;
+        let current_level = self.sections[section_idx].level;
 
-        (0..self.sections.len()).find(|&i| self.sections[i].level == current_level)
+        for i in 0..self.sections.len() {
+            if self.sections[i].level == current_level {
+                return self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(i)
+                });
+            }
+        }
+
+        None
     }
 
     #[must_use]
     /// Finds the last section at the same hierarchy level.
     pub fn navigate_to_last_at_level(&self) -> Option<usize> {
-        let current_level = self.sections[self.current_section_index].level;
+        let section_idx = self.get_current_section_index()?;
+        let current_level = self.sections[section_idx].level;
 
-        (0..self.sections.len())
-            .rev()
-            .find(|&i| self.sections[i].level == current_level)
+        for i in (0..self.sections.len()).rev() {
+            if self.sections[i].level == current_level {
+                return self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(i)
+                });
+            }
+        }
+
+        None
     }
 
     #[must_use]
     /// Calculates indentation width based on section nesting level.
     pub fn get_indent(&self) -> usize {
-        if self.sections.is_empty() {
-            return 0;
+        if let Some(section) = self.get_current_section() {
+            section.level * 2
+        } else {
+            0
         }
-        let section = &self.sections[self.current_section_index];
-        section.level * 2
     }
 
     #[must_use]
@@ -565,8 +586,10 @@ impl AppState {
 
     /// Start moving the current section
     pub fn start_move(&mut self) {
-        self.moving_section_index = Some(self.current_section_index);
-        self.move_state = MoveState::Selected;
+        if let Some(section_idx) = self.get_current_section_index() {
+            self.moving_section_index = Some(section_idx);
+            self.move_state = MoveState::Selected;
+        }
     }
 
     /// Cancel the current move operation
@@ -586,7 +609,15 @@ impl AppState {
             if moving_idx > 0 {
                 self.sections.swap(moving_idx, moving_idx - 1);
                 self.moving_section_index = Some(moving_idx - 1);
-                self.current_section_index = moving_idx - 1;
+                self.rebuild_tree();
+
+                // Update current node to follow the moved section
+                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(moving_idx - 1)
+                }) {
+                    self.current_node_index = node_idx;
+                }
+
                 self.mark_moved();
                 return true;
             }
@@ -600,7 +631,14 @@ impl AppState {
             if moving_idx < self.sections.len() - 1 {
                 self.sections.swap(moving_idx, moving_idx + 1);
                 self.moving_section_index = Some(moving_idx + 1);
-                self.current_section_index = moving_idx + 1;
+                self.rebuild_tree();
+
+                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(moving_idx + 1)
+                }) {
+                    self.current_node_index = node_idx;
+                }
+
                 self.mark_moved();
                 return true;
             }
@@ -615,7 +653,14 @@ impl AppState {
                 let section = self.sections.remove(moving_idx);
                 self.sections.insert(0, section);
                 self.moving_section_index = Some(0);
-                self.current_section_index = 0;
+                self.rebuild_tree();
+
+                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(0)
+                }) {
+                    self.current_node_index = node_idx;
+                }
+
                 self.mark_moved();
                 return true;
             }
@@ -631,7 +676,14 @@ impl AppState {
                 let section = self.sections.remove(moving_idx);
                 self.sections.push(section);
                 self.moving_section_index = Some(last_idx);
-                self.current_section_index = last_idx;
+                self.rebuild_tree();
+
+                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
+                    n.section_index == Some(last_idx)
+                }) {
+                    self.current_node_index = node_idx;
+                }
+
                 self.mark_moved();
                 return true;
             }
@@ -644,6 +696,7 @@ impl AppState {
         if let Some(moving_idx) = self.moving_section_index {
             if self.sections[moving_idx].level > 1 {
                 self.sections[moving_idx].level -= 1;
+                self.rebuild_tree();
                 self.mark_moved();
                 return true;
             }
@@ -656,6 +709,7 @@ impl AppState {
         if let Some(moving_idx) = self.moving_section_index {
             if self.sections[moving_idx].level < 6 {
                 self.sections[moving_idx].level += 1;
+                self.rebuild_tree();
                 self.mark_moved();
                 return true;
             }
@@ -664,17 +718,6 @@ impl AppState {
     }
 
     /// Apply section reordering to disk
-    ///
-    /// Rewrites files with sections in their new order and with updated heading levels.
-    /// After successful write, reloads all sections from disk to ensure accurate byte
-    /// positions and line numbers.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - File read operations fail
-    /// - File write operations fail
-    /// - Section extraction/parsing fails after rewrite
     pub fn save_section_reorder(&mut self) -> io::Result<()> {
         if self.move_state != MoveState::Moved {
             return Ok(());
@@ -704,6 +747,7 @@ impl AppState {
         }
 
         self.sections = new_sections;
+        self.rebuild_tree();
         self.cancel_move();
         self.message = Some("Sections reordered".to_string());
 
@@ -741,8 +785,6 @@ impl AppState {
         fs::write(file_path, new_content)?;
         Ok(())
     }
-
-    // --- </Section List Movement> ---
 }
 
 #[cfg(test)]

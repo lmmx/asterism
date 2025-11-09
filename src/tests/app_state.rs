@@ -20,8 +20,8 @@ fn test_edit_persists_correctly() {
             line_end: 4,
             column_start: 0,
             column_end: 7,
-            byte_start: 10, // after "# Hello\n\n"
-            byte_end: 12,   // before "\n\n## World"
+            byte_start: 10,
+            byte_end: 12,
             file_path: path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: vec![1],
@@ -44,6 +44,11 @@ fn test_edit_persists_correctly() {
     ];
 
     let mut app = AppState::new(vec![path.clone()], sections, 100);
+
+    // Find first navigable node (should be first section)
+    if let Some(first) = app.navigate_to_first() {
+        app.current_node_index = first;
+    }
 
     // Enter detail view for first section
     app.enter_detail_view();
@@ -90,6 +95,10 @@ fn test_edit_plan_captures_changes() {
     }];
 
     let mut app = AppState::new(vec![path.clone()], sections, 100);
+
+    if let Some(first) = app.navigate_to_first() {
+        app.current_node_index = first;
+    }
 
     app.enter_detail_view();
 
@@ -164,8 +173,10 @@ fn test_multiple_edits_correct_offsets() {
 
     let mut app = AppState::new(vec![path.clone()], sections, 100);
 
-    // Edit first section: A -> AAA (adds 2 lines)
-    app.current_section_index = 0;
+    // Find and edit first section
+    if let Some(first) = app.navigate_to_first() {
+        app.current_node_index = first;
+    }
     app.enter_detail_view();
     if let Some(ref mut editor_state) = app.editor_state {
         editor_state.lines = edtui::Lines::from("\nAAA\n");
@@ -173,8 +184,18 @@ fn test_multiple_edits_correct_offsets() {
     app.save_current().unwrap();
     app.exit_detail_view(true);
 
-    // Edit third section: C -> CCC
-    app.current_section_index = 2;
+    // Find and edit third section (index 2)
+    // After rebuild, need to find the section again
+    if let Some(node_idx) = app.tree_nodes.iter().position(|n| {
+        if let Some(section_idx) = n.section_index {
+            app.sections.get(section_idx).map_or(false, |s| s.title == "Three")
+        } else {
+            false
+        }
+    }) {
+        app.current_node_index = node_idx;
+    }
+
     app.enter_detail_view();
     if let Some(ref mut editor_state) = app.editor_state {
         editor_state.lines = edtui::Lines::from("\nCCC\n");
@@ -192,4 +213,187 @@ fn test_multiple_edits_correct_offsets() {
         "Second edit should be at correct position: {content}"
     );
     assert!(content.contains("## Two"), "Middle section should remain");
+}
+
+#[test]
+fn test_tree_structure_single_file() {
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(file, "# One\n\nA\n\n## Two\n\nB").unwrap();
+    let path = file.path().to_path_buf();
+
+    let sections = vec![
+        Section {
+            title: "One".to_string(),
+            level: 1,
+            line_start: 2,
+            line_end: 4,
+            column_start: 0,
+            column_end: 5,
+            byte_start: 8,
+            byte_end: 10,
+            file_path: path.to_string_lossy().to_string(),
+            parent_index: None,
+            children_indices: vec![1],
+            doc_comment: None,
+        },
+        Section {
+            title: "Two".to_string(),
+            level: 2,
+            line_start: 5,
+            line_end: 7,
+            column_start: 0,
+            column_end: 7,
+            byte_start: 19,
+            byte_end: 21,
+            file_path: path.to_string_lossy().to_string(),
+            parent_index: Some(0),
+            children_indices: vec![],
+            doc_comment: None,
+        },
+    ];
+
+    let app = AppState::new(vec![path], sections, 100);
+
+    // Single file mode should only show sections, no file nodes
+    assert_eq!(app.tree_nodes.len(), 2);
+    assert!(app.tree_nodes[0].navigable);
+    assert!(app.tree_nodes[1].navigable);
+}
+
+#[test]
+fn test_tree_structure_multi_file() {
+    let mut file1 = NamedTempFile::new().unwrap();
+    let mut file2 = NamedTempFile::new().unwrap();
+
+    writeln!(file1, "# One\n\nA").unwrap();
+    writeln!(file2, "# Two\n\nB").unwrap();
+
+    let path1 = file1.path().to_path_buf();
+    let path2 = file2.path().to_path_buf();
+
+    let sections = vec![
+        Section {
+            title: "One".to_string(),
+            level: 1,
+            line_start: 2,
+            line_end: 3,
+            column_start: 0,
+            column_end: 5,
+            byte_start: 8,
+            byte_end: 10,
+            file_path: path1.to_string_lossy().to_string(),
+            parent_index: None,
+            children_indices: vec![],
+            doc_comment: None,
+        },
+        Section {
+            title: "Two".to_string(),
+            level: 1,
+            line_start: 2,
+            line_end: 3,
+            column_start: 0,
+            column_end: 5,
+            byte_start: 8,
+            byte_end: 10,
+            file_path: path2.to_string_lossy().to_string(),
+            parent_index: None,
+            children_indices: vec![],
+            doc_comment: None,
+        },
+    ];
+
+    let app = AppState::new(vec![path1, path2], sections, 100);
+
+    // Multi-file mode should show file nodes + sections
+    // 2 files + 2 sections = 4 nodes
+    assert_eq!(app.tree_nodes.len(), 4);
+
+    // File nodes should not be navigable
+    let mut file_nodes = 0;
+    let mut section_nodes = 0;
+    for node in &app.tree_nodes {
+        if node.navigable {
+            section_nodes += 1;
+        } else {
+            file_nodes += 1;
+        }
+    }
+
+    assert_eq!(file_nodes, 2, "Should have 2 file nodes");
+    assert_eq!(section_nodes, 2, "Should have 2 section nodes");
+}
+
+#[test]
+fn test_navigation_skips_files() {
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(file, "# One\n\nA\n\n## Two\n\nB").unwrap();
+    let path = file.path().to_path_buf();
+
+    // Create a fake multi-file scenario with one file
+    let mut file2 = NamedTempFile::new().unwrap();
+    writeln!(file2, "# Three\n\nC").unwrap();
+    let path2 = file2.path().to_path_buf();
+
+    let sections = vec![
+        Section {
+            title: "One".to_string(),
+            level: 1,
+            line_start: 2,
+            line_end: 4,
+            column_start: 0,
+            column_end: 5,
+            byte_start: 8,
+            byte_end: 10,
+            file_path: path.to_string_lossy().to_string(),
+            parent_index: None,
+            children_indices: vec![1],
+            doc_comment: None,
+        },
+        Section {
+            title: "Two".to_string(),
+            level: 2,
+            line_start: 5,
+            line_end: 7,
+            column_start: 0,
+            column_end: 7,
+            byte_start: 19,
+            byte_end: 21,
+            file_path: path.to_string_lossy().to_string(),
+            parent_index: Some(0),
+            children_indices: vec![],
+            doc_comment: None,
+        },
+        Section {
+            title: "Three".to_string(),
+            level: 1,
+            line_start: 2,
+            line_end: 3,
+            column_start: 0,
+            column_end: 7,
+            byte_start: 10,
+            byte_end: 12,
+            file_path: path2.to_string_lossy().to_string(),
+            parent_index: None,
+            children_indices: vec![],
+            doc_comment: None,
+        },
+    ];
+
+    let mut app = AppState::new(vec![path, path2], sections, 100);
+
+    // Start at first position (should be file node, non-navigable)
+    app.current_node_index = 0;
+    assert!(!app.tree_nodes[0].navigable, "First node should be file (non-navigable)");
+
+    // Navigate to next - should skip to first section
+    if let Some(next) = app.find_next_node() {
+        app.current_node_index = next;
+    }
+
+    assert!(app.tree_nodes[app.current_node_index].navigable, "Should skip to navigable node");
+    assert_eq!(
+        app.get_current_section().map(|s| s.title.as_str()),
+        Some("One"),
+        "Should be on 'One' section"
+    );
 }

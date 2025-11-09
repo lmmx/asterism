@@ -112,39 +112,8 @@ fn run_app<B: ratatui::backend::Backend>(
 
         if let Event::Key(key) = event::read()? {
             match app.current_view {
-                app_state::View::FileList => match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Up => {
-                        if app.current_file_index > 0 {
-                            app.current_file_index -= 1;
-                        }
-                    }
-                    KeyCode::Down => {
-                        if app.current_file_index < app.files.len() - 1 {
-                            app.current_file_index += 1;
-                        }
-                    }
-                    KeyCode::Enter => {
-                        // Load sections for selected file
-                        let format = formats::markdown::MarkdownFormat;
-                        if let Ok(sections) =
-                            input::extract_sections(&app.files[app.current_file_index], &format)
-                        {
-                            app.sections = sections;
-                            app.current_section_index = 0;
-                            app.current_view = app_state::View::List;
-                        }
-                    }
-                    _ => {}
-                },
                 app_state::View::List => match key.code {
-                    KeyCode::Char('q') => {
-                        if app.file_mode == app_state::FileMode::Multi {
-                            app.current_view = app_state::View::FileList;
-                        } else {
-                            return Ok(());
-                        }
-                    }
+                    KeyCode::Char('q') => return Ok(()),
                     KeyCode::Up => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
                             // Ctrl+Up: Start move or move up
@@ -156,18 +125,18 @@ fn run_app<B: ratatui::backend::Backend>(
                         } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Up: Jump to previous sibling at same level
                             if let Some(prev_sibling) = app.navigate_to_prev_sibling() {
-                                app.current_section_index = prev_sibling;
+                                app.current_node_index = prev_sibling;
                             }
                         } else {
-                            // Normal up: Previous section
-                            if app.current_section_index > 0 {
-                                app.current_section_index -= 1;
+                            // Normal up: Previous navigable node
+                            if let Some(prev) = app.find_prev_node() {
+                                app.current_node_index = prev;
                             }
                         }
                     }
                     KeyCode::Down => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Down: Start move (if not moving) or move down
+                            // Ctrl+Down: Start move or move down
                             if app.move_state == app_state::MoveState::None {
                                 app.start_move();
                             } else {
@@ -176,37 +145,37 @@ fn run_app<B: ratatui::backend::Backend>(
                         } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Down: Jump to next sibling at same level
                             if let Some(next_sibling) = app.navigate_to_next_sibling() {
-                                app.current_section_index = next_sibling;
+                                app.current_node_index = next_sibling;
                             }
                         } else {
-                            // Normal down: Next section
-                            if app.current_section_index < app.sections.len() - 1 {
-                                app.current_section_index += 1;
+                            // Normal down: Next navigable node
+                            if let Some(next) = app.find_next_node() {
+                                app.current_node_index = next;
                             }
                         }
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Left: Start move or decrease level (move in)
+                            // Ctrl+Left: Start move or decrease level
                             if app.move_state == app_state::MoveState::None {
                                 app.start_move();
                             } else {
                                 app.move_section_in();
                             }
                         } else if let Some(parent_idx) = app.navigate_to_parent() {
-                            app.current_section_index = parent_idx;
+                            app.current_node_index = parent_idx;
                         }
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Right: Start move or increase level (move out)
+                            // Ctrl+Right: Start move or increase level
                             if app.move_state == app_state::MoveState::None {
                                 app.start_move();
                             } else {
                                 app.move_section_out();
                             }
                         } else if let Some(descendant_idx) = app.navigate_to_next_descendant() {
-                            app.current_section_index = descendant_idx;
+                            app.current_node_index = descendant_idx;
                         }
                     }
                     KeyCode::Home => {
@@ -218,12 +187,12 @@ fn run_app<B: ratatui::backend::Backend>(
                         } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Home: Jump to first section at same level
                             if let Some(first_at_level) = app.navigate_to_first_at_level() {
-                                app.current_section_index = first_at_level;
+                                app.current_node_index = first_at_level;
                             }
                         } else {
-                            // Home: Jump to first section
+                            // Home: Jump to first navigable node
                             if let Some(first) = app.navigate_to_first() {
-                                app.current_section_index = first;
+                                app.current_node_index = first;
                             }
                         }
                     }
@@ -236,12 +205,12 @@ fn run_app<B: ratatui::backend::Backend>(
                         } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+End: Jump to last section at same level
                             if let Some(last_at_level) = app.navigate_to_last_at_level() {
-                                app.current_section_index = last_at_level;
+                                app.current_node_index = last_at_level;
                             }
                         } else {
-                            // End: Jump to last section
+                            // End: Jump to last navigable node
                             if let Some(last) = app.navigate_to_last() {
-                                app.current_section_index = last;
+                                app.current_node_index = last;
                             }
                         }
                     }
@@ -251,14 +220,16 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Char(':') => {
-                        // Allow entering command mode from move state to save
                         app.current_view = app_state::View::Command;
                         app.command_buffer.clear();
                         app.message = None;
                     }
                     KeyCode::Enter => {
-                        // Don't enter detail view while moving
-                        if app.move_state == app_state::MoveState::None {
+                        // Only enter detail view if on a navigable node
+                        if app.move_state == app_state::MoveState::None
+                            && app.current_node_index < app.tree_nodes.len()
+                            && app.tree_nodes[app.current_node_index].navigable
+                        {
                             app.enter_detail_view();
                         }
                     }
@@ -302,7 +273,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Enter => {
                         let cmd = app.command_buffer.clone();
-                        app.current_view = app_state::View::List; // Always return to List view
+                        app.current_view = app_state::View::List;
 
                         match cmd.as_str() {
                             "w" => {
@@ -311,7 +282,6 @@ fn run_app<B: ratatui::backend::Backend>(
                                         app.message = Some(format!("Error saving: {e}"));
                                     }
                                 } else if app.editor_state.is_some() {
-                                    // Only save current section if we're in the editor
                                     if let Err(e) = app.save_current() {
                                         app.message = Some(format!("Error saving: {e}"));
                                     }
@@ -338,21 +308,16 @@ fn run_app<B: ratatui::backend::Backend>(
                                 } else if app.move_state != app_state::MoveState::None {
                                     app.cancel_move();
                                 } else {
-                                    // Quit application logic
-                                    if app.file_mode == app_state::FileMode::Multi {
-                                        app.current_view = app_state::View::FileList;
-                                    } else {
-                                        return Ok(());
-                                    }
+                                    return Ok(());
                                 }
                             }
                             "wn" => {
                                 if app.editor_state.is_some() {
                                     if let Err(e) = app.save_current() {
                                         app.message = Some(format!("Error saving: {e}"));
-                                    } else if let Some(next) = app.find_next_section() {
+                                    } else if let Some(next) = app.find_next_node() {
                                         app.exit_detail_view(true);
-                                        app.current_section_index = next;
+                                        app.current_node_index = next;
                                         app.enter_detail_view();
                                     } else {
                                         app.message = Some("No more sections".to_string());
@@ -363,9 +328,9 @@ fn run_app<B: ratatui::backend::Backend>(
                                 if app.editor_state.is_some() {
                                     if let Err(e) = app.save_current() {
                                         app.message = Some(format!("Error saving: {e}"));
-                                    } else if let Some(prev) = app.find_prev_section() {
+                                    } else if let Some(prev) = app.find_prev_node() {
                                         app.exit_detail_view(true);
-                                        app.current_section_index = prev;
+                                        app.current_node_index = prev;
                                         app.enter_detail_view();
                                     } else {
                                         app.message = Some("No previous sections".to_string());
@@ -379,7 +344,7 @@ fn run_app<B: ratatui::backend::Backend>(
                         app.command_buffer.clear();
                     }
                     KeyCode::Esc => {
-                        app.current_view = app_state::View::List; // Return to List view, not Detail
+                        app.current_view = app_state::View::List;
                         app.command_buffer.clear();
                     }
                     _ => {}
