@@ -673,7 +673,7 @@ impl AppState {
     ///
     /// Returns an error if:
     /// - File read operations fail
-    /// - File write operations fail  
+    /// - File write operations fail
     /// - Section extraction/parsing fails after rewrite
     pub fn save_section_reorder(&mut self) -> io::Result<()> {
         if self.move_state != MoveState::Moved {
