@@ -32,6 +32,25 @@ pub struct Section {
     pub children_indices: Vec<usize>,
     /// Edited content for this section (if modified)
     pub doc_comment: Option<Vec<String>>,
+    /// The chunk type (for diffs)
+    pub chunk_type: Option<ChunkType>,
+    /// The LHS (for diffs)
+    pub lhs_content: Option<String>,
+    /// The RHS (for diffs)
+    pub rhs_content: Option<String>,
+}
+
+#[derive(Clone)]
+/// What sort of hunk (syntactic diff atomic unit) it is.
+pub enum ChunkType {
+    /// Only RHS exists
+    Added,
+    /// Only LHS exists
+    Deleted,
+    /// Both LHS and RHS exist (and differ)
+    Modified,
+    /// Both LHS and RHS exist (and are the same, at least syntactically)
+    Unchanged,
 }
 
 #[derive(Clone)]

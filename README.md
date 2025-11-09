@@ -47,6 +47,36 @@ Edit a specific file:
 asterism README.md
 ```
 
+## Difftastic Integration
+
+asterism can display and navigate difftastic structural diffs:
+
+### From a JSON file:
+```sh
+difft --display json file1.rs file2.rs > diff.json
+asterism -d diff.json
+```
+
+### From stdin:
+```sh
+difft --display json file1.rs file2.rs | asterism --stdin
+```
+
+### As a git difftool:
+```sh
+# In .gitconfig:
+[diff]
+    tool = asterism-difft
+[difftool "asterism-difft"]
+    cmd = difft --display json \"$LOCAL\" \"$REMOTE\" | asterism --stdin
+```
+
+In difftastic mode:
+- Files are shown as top-level sections
+- Each diff hunk appears as a nested section
+- Navigate and review changes hierarchically
+- Hunks display with line numbers and +/- prefixes
+
 ## Keybindings
 
 ### List View

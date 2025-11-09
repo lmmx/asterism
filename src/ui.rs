@@ -59,7 +59,15 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(f.area());
 
-    let format = crate::formats::markdown::MarkdownFormat;
+    // Determine if we're in difftastic mode by checking if any section has chunk_type
+    let is_difftastic = app.sections.iter().any(|s| s.chunk_type.is_some())
+        || app.sections.iter().any(|s| s.title.contains("@@"));
+
+    let format: Box<dyn Format> = if is_difftastic {
+        Box::new(crate::formats::difftastic::DifftasticFormat)
+    } else {
+        Box::new(crate::formats::markdown::MarkdownFormat)
+    };
 
     // Calculate which nodes are last at their level for box-drawing
     let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
@@ -133,8 +141,9 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
+                    let mut highlighted_line = format
+                        .as_ref()
+                        .format_section_display(section.level, &section.title);
 
                     // Prepend tree prefix
                     let mut spans = vec![Span::raw(tree_prefix)];
@@ -205,7 +214,15 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(f.area());
 
-    let format = crate::formats::markdown::MarkdownFormat;
+    // Determine if we're in difftastic mode by checking if any section has chunk_type
+    let is_difftastic = app.sections.iter().any(|s| s.chunk_type.is_some())
+        || app.sections.iter().any(|s| s.title.contains("@@"));
+
+    let format: Box<dyn Format> = if is_difftastic {
+        Box::new(crate::formats::difftastic::DifftasticFormat)
+    } else {
+        Box::new(crate::formats::markdown::MarkdownFormat)
+    };
 
     // Calculate which nodes are last at their level
     let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
@@ -274,10 +291,14 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
+                    let mut highlighted_line = format
+                        .as_ref()
+                        .format_section_display(section.level, &section.title);
+
+                    // Prepend tree prefix
                     let mut spans = vec![Span::raw(tree_prefix)];
                     spans.append(&mut highlighted_line.spans);
+
                     Line::from(spans)
                 }
             };

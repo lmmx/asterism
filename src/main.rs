@@ -11,6 +11,7 @@ use ratatui::crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use std::io::Read;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -28,6 +29,14 @@ struct Args {
     /// File extensions to match
     #[arg(long, short = 'e', value_name = "EXT")]
     ext: Vec<String>,
+
+    /// Parse difftastic JSON output (from stdin or file)
+    #[arg(long, short = 'd')]
+    difft: bool,
+
+    /// Read difftastic output from stdin
+    #[arg(long)]
+    stdin: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -39,6 +48,41 @@ fn main() -> io::Result<()> {
         cfg.file_extensions = args.ext;
     }
 
+    // Handle difftastic mode
+    if args.difft || args.stdin {
+        let json_content = if args.stdin {
+            // Read from stdin
+            let mut buffer = String::new();
+            io::stdin().read_to_string(&mut buffer)?;
+            buffer
+        } else if args.paths.len() == 1 {
+            // Read from file
+            std::fs::read_to_string(&args.paths[0])?
+        } else {
+            eprintln!("In difftastic mode, provide either --stdin or a single JSON file");
+            return Ok(());
+        };
+
+        let sections = formats::difftastic::parse_difftastic_json(&json_content)?;
+
+        if sections.is_empty() {
+            eprintln!("No changes found in difftastic output");
+            return Ok(());
+        }
+
+        // Extract unique file paths from sections
+        let files: Vec<PathBuf> = sections
+            .iter()
+            .map(|s| PathBuf::from(&s.file_path))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        let state = app_state::AppState::new(files, sections, cfg.wrap_width);
+        return run_tui(state, &cfg);
+    }
+
+    // Normal markdown mode
     let documents = input::find_documents(args.paths, &cfg.file_extensions)?;
 
     if documents.is_empty() {
@@ -46,7 +90,6 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
-    // Extract sections from all documents
     let format = formats::markdown::MarkdownFormat;
     let mut all_sections = Vec::new();
 
@@ -63,7 +106,6 @@ fn main() -> io::Result<()> {
 
     let mut state = app_state::AppState::new(documents, all_sections, cfg.wrap_width);
 
-    // Load docs if specified
     if let Some(load_path) = args.load_docs {
         let file_content = std::fs::read_to_string(&load_path)?;
         let plan: edit_plan::EditPlan = serde_json::from_str(&file_content)

@@ -8,6 +8,7 @@
 use crate::edit_plan::{Edit, EditPlan};
 use crate::formats::markdown::MarkdownFormat;
 use crate::input;
+use crate::section::ChunkType;
 use crate::section::{Section, TreeNode};
 use edtui::{EditorState, Lines};
 use std::collections::HashMap;
@@ -87,13 +88,16 @@ impl AppState {
 
         let tree_nodes = Self::build_tree(&files, &sections);
 
+        // Find first navigable node
+        let initial_index = tree_nodes.iter().position(|n| n.navigable).unwrap_or(0);
+
         Self {
             sections,
             tree_nodes,
             files,
             file_mode,
             current_view: View::List,
-            current_node_index: 0,
+            current_node_index: initial_index,
             editor_state: None,
             command_buffer: String::new(),
             message: None,
@@ -104,21 +108,75 @@ impl AppState {
         }
     }
 
-    /// Build the unified tree structure from files and sections
     fn build_tree(files: &[PathBuf], sections: &[Section]) -> Vec<TreeNode> {
         let mut nodes = Vec::new();
 
-        if files.len() == 1 {
-            // Single file mode: just show sections with their heading hierarchy
+        // Determine if this is difftastic mode by checking if multiple sections share the same file_path
+        // (in markdown mode, each section has a unique file path or sections are from the same file)
+        let mut file_section_counts: HashMap<String, usize> = HashMap::new();
+        for section in sections {
+            *file_section_counts
+                .entry(section.file_path.clone())
+                .or_insert(0) += 1;
+        }
+        let is_difftastic = file_section_counts.values().any(|&count| count > 1);
+
+        if files.len() == 1 && !is_difftastic {
+            // Single markdown file mode: just show sections with their heading hierarchy
             for (idx, section) in sections.iter().enumerate() {
-                nodes.push(TreeNode::section(
-                    section.clone(),
-                    section.level - 1, // Convert heading level to tree level
-                    idx,
+                nodes.push(TreeNode::section(section.clone(), section.level - 1, idx));
+            }
+        } else if is_difftastic {
+            // Difftastic mode: group sections by file, show files as non-navigable nodes
+            let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
+            let mut file_status: HashMap<String, String> = HashMap::new();
+
+            // Group sections by file
+            for (idx, section) in sections.iter().enumerate() {
+                file_tree
+                    .entry(section.file_path.clone())
+                    .or_default()
+                    .push((idx, section));
+
+                // Determine file status from hunk headers
+                if !file_status.contains_key(&section.file_path) {
+                    if section.title.contains("@@ -0,0") {
+                        file_status.insert(section.file_path.clone(), "created".to_string());
+                    } else if section.title.contains("+0,0 @@") {
+                        file_status.insert(section.file_path.clone(), "deleted".to_string());
+                    } else {
+                        file_status.insert(section.file_path.clone(), "changed".to_string());
+                    }
+                }
+            }
+
+            // Build tree with file nodes and hunk sections
+            let mut sorted_files: Vec<_> = file_tree.keys().collect();
+            sorted_files.sort();
+
+            for file_path in sorted_files {
+                // Add file node (non-navigable)
+                let file_name = PathBuf::from(file_path)
+                    .file_name()
+                    .map_or_else(|| file_path.clone(), |n| n.to_string_lossy().to_string());
+
+                let status = file_status.get(file_path).map_or("changed", String::as_str);
+
+                nodes.push(TreeNode::file(
+                    format!("{file_name} ({status})"),
+                    file_path.clone(),
+                    0,
                 ));
+
+                // Add hunk sections under this file
+                if let Some(file_sections) = file_tree.get(file_path) {
+                    for (idx, section) in file_sections {
+                        nodes.push(TreeNode::section((*section).clone(), 1, *idx));
+                    }
+                }
             }
         } else {
-            // Multi-file mode: build directory tree with sections nested under files
+            // Multi-file markdown mode: build directory tree with sections nested under files
             let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
 
             // Group sections by file
@@ -146,19 +204,9 @@ impl AppState {
                 // Add sections under this file
                 if let Some(file_sections) = file_tree.get(&path_str) {
                     for (idx, section) in file_sections {
-                        // Section tree level = 1 (under file) + heading level - 1
-                        let tree_level = section.level;
-                        nodes.push(TreeNode::section((*section).clone(), tree_level, *idx));
+                        nodes.push(TreeNode::section((*section).clone(), section.level, *idx));
                     }
                 }
-            }
-        }
-
-        // Ensure we start on a navigable node
-        if let Some(first_navigable) = nodes.iter().position(|n| n.navigable) {
-            if first_navigable > 0 {
-                // Move first navigable to start if not already there
-                // Actually, keep tree structure but navigation will skip
             }
         }
 
@@ -298,7 +346,36 @@ impl AppState {
 
         let section = &self.sections[section_idx];
 
-        if let Ok(content) = fs::read_to_string(&section.file_path) {
+        // Handle difftastic chunks differently
+        if let Some(chunk_type) = &section.chunk_type {
+            let content = match chunk_type {
+                ChunkType::Added => {
+                    // Show only RHS for added chunks
+                    section.rhs_content.clone().unwrap_or_default()
+                }
+                ChunkType::Deleted => {
+                    // Show LHS with strikethrough or special formatting
+                    section.lhs_content.clone().unwrap_or_default()
+                }
+                ChunkType::Modified => {
+                    // Show a unified or side-by-side view
+                    let lhs = section.lhs_content.as_deref().unwrap_or("");
+                    let rhs = section.rhs_content.as_deref().unwrap_or("");
+                    format!("- {lhs}\n+ {rhs}")
+                }
+                ChunkType::Unchanged => {
+                    // Show either side (they're the same)
+                    section
+                        .lhs_content
+                        .clone()
+                        .or_else(|| section.rhs_content.clone())
+                        .unwrap_or_default()
+                }
+            };
+
+            let lines = Lines::from(content.as_str());
+            self.editor_state = Some(EditorState::new(lines));
+        } else if let Ok(content) = fs::read_to_string(&section.file_path) {
             let bytes = content.as_bytes();
             let section_bytes =
                 &bytes[section.byte_start.min(bytes.len())..section.byte_end.min(bytes.len())];
