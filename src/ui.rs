@@ -52,6 +52,7 @@ fn get_tree_prefix(level: usize, is_last: bool, parent_states: &[bool]) -> Strin
     prefix
 }
 
+#[allow(clippy::too_many_lines)]
 fn draw_list(f: &mut Frame, app: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -62,8 +63,8 @@ fn draw_list(f: &mut Frame, app: &AppState) {
 
     // Calculate which nodes are last at their level for box-drawing
     let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
-    for i in 0..app.tree_nodes.len() {
-        let current_level = app.tree_nodes[i].tree_level;
+    for (i, node) in app.tree_nodes.iter().enumerate() {
+        let current_level = node.tree_level;
 
         // Check if there's another node at the same level after this one
         let mut found_next = false;
@@ -95,7 +96,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
             while parent_has_siblings.len() < node.tree_level {
                 parent_has_siblings.push(false);
             }
-            if node.tree_level > 0 && parent_has_siblings.len() > 0 {
+            if node.tree_level > 0 && !parent_has_siblings.is_empty() {
                 let parent_idx = parent_has_siblings.len() - 1;
                 parent_has_siblings[parent_idx] = !is_last_at_level[i];
             }
@@ -111,8 +112,10 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📁 {}", name),
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                            format!("📁 {name}"),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
                         ),
                     ];
                     Line::from(spans)
@@ -121,8 +124,10 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {}", name),
-                            Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD),
+                            format!("📄 {name}"),
+                            Style::default()
+                                .fg(Color::Blue)
+                                .add_modifier(Modifier::BOLD),
                         ),
                     ];
                     Line::from(spans)
@@ -169,7 +174,10 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         })
         .collect();
 
-    let title = match (app.file_mode == crate::app_state::FileMode::Multi, &app.move_state) {
+    let title = match (
+        app.file_mode == crate::app_state::FileMode::Multi,
+        &app.move_state,
+    ) {
         (true, MoveState::None) => format!("Files & Sections ({} files)", app.files.len()),
         (true, _) => format!("Files & Sections (MOVING - {} files)", app.files.len()),
         (false, MoveState::None) => "Sections".to_string(),
@@ -190,6 +198,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
     f.render_widget(help_widget, chunks[1]);
 }
 
+#[allow(clippy::too_many_lines)]
 fn draw_list_with_command(f: &mut Frame, app: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -200,8 +209,8 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
 
     // Calculate which nodes are last at their level
     let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
-    for i in 0..app.tree_nodes.len() {
-        let current_level = app.tree_nodes[i].tree_level;
+    for (i, node) in app.tree_nodes.iter().enumerate() {
+        let current_level = node.tree_level;
         let mut found_next = false;
         for j in (i + 1)..app.tree_nodes.len() {
             if app.tree_nodes[j].tree_level < current_level {
@@ -244,8 +253,10 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📁 {}", name),
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                            format!("📁 {name}"),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
                         ),
                     ];
                     Line::from(spans)
@@ -254,8 +265,10 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {}", name),
-                            Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD),
+                            format!("📄 {name}"),
+                            Style::default()
+                                .fg(Color::Blue)
+                                .add_modifier(Modifier::BOLD),
                         ),
                     ];
                     Line::from(spans)
@@ -297,7 +310,10 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
         })
         .collect();
 
-    let title = match (app.file_mode == crate::app_state::FileMode::Multi, &app.move_state) {
+    let title = match (
+        app.file_mode == crate::app_state::FileMode::Multi,
+        &app.move_state,
+    ) {
         (true, MoveState::None) => format!("Files & Sections ({} files)", app.files.len()),
         (true, _) => format!("Files & Sections (MOVING - {} files)", app.files.len()),
         (false, MoveState::None) => "Sections".to_string(),

@@ -188,7 +188,9 @@ fn test_multiple_edits_correct_offsets() {
     // After rebuild, need to find the section again
     if let Some(node_idx) = app.tree_nodes.iter().position(|n| {
         if let Some(section_idx) = n.section_index {
-            app.sections.get(section_idx).map_or(false, |s| s.title == "Three")
+            app.sections
+                .get(section_idx)
+                .map_or(false, |s| s.title == "Three")
         } else {
             false
         }
@@ -383,14 +385,20 @@ fn test_navigation_skips_files() {
 
     // Start at first position (should be file node, non-navigable)
     app.current_node_index = 0;
-    assert!(!app.tree_nodes[0].navigable, "First node should be file (non-navigable)");
+    assert!(
+        !app.tree_nodes[0].navigable,
+        "First node should be file (non-navigable)"
+    );
 
     // Navigate to next - should skip to first section
     if let Some(next) = app.find_next_node() {
         app.current_node_index = next;
     }
 
-    assert!(app.tree_nodes[app.current_node_index].navigable, "Should skip to navigable node");
+    assert!(
+        app.tree_nodes[app.current_node_index].navigable,
+        "Should skip to navigable node"
+    );
     assert_eq!(
         app.get_current_section().map(|s| s.title.as_str()),
         Some("One"),

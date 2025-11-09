@@ -70,6 +70,7 @@ pub struct TreeNode {
 
 impl TreeNode {
     /// Create a directory node
+    #[must_use]
     pub fn directory(name: String, path: String, tree_level: usize) -> Self {
         Self {
             node_type: NodeType::Directory { name, path },
@@ -80,6 +81,7 @@ impl TreeNode {
     }
 
     /// Create a file node
+    #[must_use]
     pub fn file(name: String, path: String, tree_level: usize) -> Self {
         Self {
             node_type: NodeType::File { name, path },
@@ -90,6 +92,7 @@ impl TreeNode {
     }
 
     /// Create a section node
+    #[must_use]
     pub fn section(section: Section, tree_level: usize, section_index: usize) -> Self {
         Self {
             node_type: NodeType::Section(section),

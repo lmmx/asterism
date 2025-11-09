@@ -8,10 +8,10 @@
 use crate::edit_plan::{Edit, EditPlan};
 use crate::formats::markdown::MarkdownFormat;
 use crate::input;
-use crate::section::{NodeType, Section, TreeNode};
+use crate::section::{Section, TreeNode};
 use edtui::{EditorState, Lines};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{fs, io};
 
 #[derive(PartialEq)]
@@ -139,8 +139,7 @@ impl AppState {
                 // Add file node (non-navigable)
                 let file_name = file_path
                     .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| path_str.clone());
+                    .map_or_else(|| path_str.clone(), |n| n.to_string_lossy().to_string());
 
                 nodes.push(TreeNode::file(file_name, path_str.clone(), 0));
 
@@ -149,7 +148,7 @@ impl AppState {
                     for (idx, section) in file_sections {
                         // Section tree level = 1 (under file) + heading level - 1
                         let tree_level = section.level;
-                        nodes.push(TreeNode::section(section.clone(), tree_level, *idx));
+                        nodes.push(TreeNode::section((*section).clone(), tree_level, *idx));
                     }
                 }
             }
@@ -172,9 +171,11 @@ impl AppState {
 
         // Try to maintain current position by finding same section
         if let Some(current_section_idx) = self.get_current_section_index() {
-            if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                n.section_index == Some(current_section_idx)
-            }) {
+            if let Some(node_idx) = self
+                .tree_nodes
+                .iter()
+                .position(|n| n.section_index == Some(current_section_idx))
+            {
                 self.current_node_index = node_idx;
             }
         }
@@ -336,6 +337,10 @@ impl AppState {
     }
 
     /// Save the current section's content to disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to disk fails or if file operations cannot complete.
     pub fn save_current(&mut self) -> io::Result<()> {
         let editor_lines = if let Some(ref editor_state) = self.editor_state {
             editor_state
@@ -394,9 +399,11 @@ impl AppState {
                 self.rebuild_tree();
 
                 // Find node with this section index
-                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(new_global_index)
-                }) {
+                if let Some(node_idx) = self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(new_global_index))
+                {
                     self.current_node_index = node_idx;
                 }
             } else {
@@ -413,23 +420,16 @@ impl AppState {
     /// Navigate to next navigable node
     #[must_use]
     pub fn find_next_node(&self) -> Option<usize> {
-        for i in (self.current_node_index + 1)..self.tree_nodes.len() {
-            if self.tree_nodes[i].navigable {
-                return Some(i);
-            }
-        }
-        None
+        ((self.current_node_index + 1)..self.tree_nodes.len())
+            .find(|&i| self.tree_nodes[i].navigable)
     }
 
     /// Navigate to previous navigable node
     #[must_use]
     pub fn find_prev_node(&self) -> Option<usize> {
-        for i in (0..self.current_node_index).rev() {
-            if self.tree_nodes[i].navigable {
-                return Some(i);
-            }
-        }
-        None
+        (0..self.current_node_index)
+            .rev()
+            .find(|&i| self.tree_nodes[i].navigable)
     }
 
     #[must_use]
@@ -439,9 +439,9 @@ impl AppState {
         let parent_section_idx = self.sections[section_idx].parent_index?;
 
         // Find tree node with this section index
-        self.tree_nodes.iter().position(|n| {
-            n.section_index == Some(parent_section_idx)
-        })
+        self.tree_nodes
+            .iter()
+            .position(|n| n.section_index == Some(parent_section_idx))
     }
 
     #[must_use]
@@ -450,9 +450,9 @@ impl AppState {
         let section_idx = self.get_current_section_index()?;
         let first_child_idx = self.sections[section_idx].children_indices.first()?;
 
-        self.tree_nodes.iter().position(|n| {
-            n.section_index == Some(*first_child_idx)
-        })
+        self.tree_nodes
+            .iter()
+            .position(|n| n.section_index == Some(*first_child_idx))
     }
 
     #[must_use]
@@ -462,17 +462,19 @@ impl AppState {
 
         // First try immediate children
         if let Some(first_child) = self.sections[section_idx].children_indices.first() {
-            return self.tree_nodes.iter().position(|n| {
-                n.section_index == Some(*first_child)
-            });
+            return self
+                .tree_nodes
+                .iter()
+                .position(|n| n.section_index == Some(*first_child));
         }
 
         // Otherwise find next section at deeper level
         for i in (section_idx + 1)..self.sections.len() {
             if self.sections[i].level > self.sections[section_idx].level {
-                return self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(i)
-                });
+                return self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(i));
             }
         }
 
@@ -487,9 +489,10 @@ impl AppState {
 
         for i in (section_idx + 1)..self.sections.len() {
             if self.sections[i].level == current_level {
-                return self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(i)
-                });
+                return self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(i));
             }
             if self.sections[i].level < current_level {
                 break;
@@ -507,9 +510,10 @@ impl AppState {
 
         for i in (0..section_idx).rev() {
             if self.sections[i].level == current_level {
-                return self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(i)
-                });
+                return self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(i));
             }
             if self.sections[i].level < current_level {
                 break;
@@ -539,9 +543,10 @@ impl AppState {
 
         for i in 0..self.sections.len() {
             if self.sections[i].level == current_level {
-                return self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(i)
-                });
+                return self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(i));
             }
         }
 
@@ -556,9 +561,10 @@ impl AppState {
 
         for i in (0..self.sections.len()).rev() {
             if self.sections[i].level == current_level {
-                return self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(i)
-                });
+                return self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(i));
             }
         }
 
@@ -612,9 +618,11 @@ impl AppState {
                 self.rebuild_tree();
 
                 // Update current node to follow the moved section
-                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(moving_idx - 1)
-                }) {
+                if let Some(node_idx) = self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(moving_idx - 1))
+                {
                     self.current_node_index = node_idx;
                 }
 
@@ -633,9 +641,11 @@ impl AppState {
                 self.moving_section_index = Some(moving_idx + 1);
                 self.rebuild_tree();
 
-                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(moving_idx + 1)
-                }) {
+                if let Some(node_idx) = self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(moving_idx + 1))
+                {
                     self.current_node_index = node_idx;
                 }
 
@@ -655,9 +665,11 @@ impl AppState {
                 self.moving_section_index = Some(0);
                 self.rebuild_tree();
 
-                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(0)
-                }) {
+                if let Some(node_idx) = self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(0))
+                {
                     self.current_node_index = node_idx;
                 }
 
@@ -678,9 +690,11 @@ impl AppState {
                 self.moving_section_index = Some(last_idx);
                 self.rebuild_tree();
 
-                if let Some(node_idx) = self.tree_nodes.iter().position(|n| {
-                    n.section_index == Some(last_idx)
-                }) {
+                if let Some(node_idx) = self
+                    .tree_nodes
+                    .iter()
+                    .position(|n| n.section_index == Some(last_idx))
+                {
                     self.current_node_index = node_idx;
                 }
 
@@ -718,6 +732,10 @@ impl AppState {
     }
 
     /// Apply section reordering to disk
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to disk fails or if file operations cannot complete.
     pub fn save_section_reorder(&mut self) -> io::Result<()> {
         if self.move_state != MoveState::Moved {
             return Ok(());
