@@ -7,8 +7,7 @@
 
 Hyperbolic navigation for tree data
 
-![You are here](https://github.com/user-attachments/assets/b39e2c66-4793-42c6-a7ab-71afe10b0095)
-
+![You are here](https://github.com/user-attachments/assets/26c005dc-5444-458e-ad58-b506fa9518c6)
 
 > You are here
 
