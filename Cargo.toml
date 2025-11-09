@@ -5,7 +5,7 @@ path = "src/main.rs"
 [dependencies]
 # atty = "0.2"
 clap = { features = ["derive"], version = "4.5" }
-edtui = { features = ["arboard", "syntax-highlighting"], version = "0.9.8" }
+edtui = { features = ["arboard", "syntax-highlighting"], version = "0.9.9" }
 facet = "0.30"
 facet-toml = "0.30"
 ratatui = "0.29"
