@@ -111,16 +111,71 @@ impl AppState {
     fn build_tree(files: &[PathBuf], sections: &[Section]) -> Vec<TreeNode> {
         let mut nodes = Vec::new();
 
-        // Check if we're dealing with difftastic chunks or markdown sections
-        let has_chunks = sections.iter().any(|s| s.chunk_type.is_some());
+        // Determine if this is difftastic mode by checking if multiple sections share the same file_path
+        // (in markdown mode, each section has a unique file path or sections are from the same file)
+        let mut file_section_counts: HashMap<String, usize> = HashMap::new();
+        for section in sections {
+            *file_section_counts
+                .entry(section.file_path.clone())
+                .or_insert(0) += 1;
+        }
+        let is_difftastic = file_section_counts.values().any(|&count| count > 1);
 
-        if files.len() == 1 && !has_chunks {
+        if files.len() == 1 && !is_difftastic {
             // Single markdown file mode: just show sections with their heading hierarchy
             for (idx, section) in sections.iter().enumerate() {
                 nodes.push(TreeNode::section(section.clone(), section.level - 1, idx));
             }
+        } else if is_difftastic {
+            // Difftastic mode: group sections by file, show files as non-navigable nodes
+            let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
+
+            // Group sections by file
+            for (idx, section) in sections.iter().enumerate() {
+                file_tree
+                    .entry(section.file_path.clone())
+                    .or_default()
+                    .push((idx, section));
+            }
+
+            // Build tree with file nodes and hunk sections
+            let mut sorted_files: Vec<_> = file_tree.keys().collect();
+            sorted_files.sort();
+
+            for file_path in sorted_files {
+                // Add file node (non-navigable)
+                let file_name = PathBuf::from(file_path)
+                    .file_name()
+                    .map_or_else(|| file_path.clone(), |n| n.to_string_lossy().to_string());
+
+                // Determine status from first section (they're all from same file)
+                let status = if let Some((_, first_section)) = file_tree[file_path].first() {
+                    if first_section.title.contains("created") {
+                        "created"
+                    } else if first_section.title.contains("deleted") {
+                        "deleted"
+                    } else {
+                        "changed"
+                    }
+                } else {
+                    "changed"
+                };
+
+                nodes.push(TreeNode::file(
+                    format!("{} ({})", file_name, status),
+                    file_path.clone(),
+                    0,
+                ));
+
+                // Add hunk sections under this file
+                if let Some(file_sections) = file_tree.get(file_path) {
+                    for (idx, section) in file_sections {
+                        nodes.push(TreeNode::section((*section).clone(), 1, *idx));
+                    }
+                }
+            }
         } else {
-            // Multi-file mode OR difftastic mode: build directory tree with sections nested under files
+            // Multi-file markdown mode: build directory tree with sections nested under files
             let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
 
             // Group sections by file
@@ -148,8 +203,7 @@ impl AppState {
                 // Add sections under this file
                 if let Some(file_sections) = file_tree.get(&path_str) {
                     for (idx, section) in file_sections {
-                        let tree_level = if has_chunks { 1 } else { section.level };
-                        nodes.push(TreeNode::section((*section).clone(), tree_level, *idx));
+                        nodes.push(TreeNode::section((*section).clone(), section.level, *idx));
                     }
                 }
             }

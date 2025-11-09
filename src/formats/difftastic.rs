@@ -100,53 +100,6 @@ impl Format for DifftasticFormat {
     }
 }
 
-fn create_file_section(file_path: &str, status: &str, line_number: i64) -> Section {
-    Section {
-        title: format!("{} ({})", file_path, status),
-        level: 1,
-        line_start: line_number,
-        line_end: line_number + 1,
-        column_start: 0,
-        column_end: 0,
-        byte_start: 0,
-        byte_end: 0,
-        file_path: file_path.to_string(),
-        parent_index: None,
-        children_indices: Vec::new(),
-        doc_comment: None,
-        chunk_type: None,
-        lhs_content: None,
-        rhs_content: None,
-    }
-}
-
-fn create_hunk_section(
-    file_path: &str,
-    title: String,
-    content: String,
-    line_start: i64,
-    line_end: i64,
-    parent_idx: usize,
-) -> Section {
-    Section {
-        title,
-        level: 2,
-        line_start,
-        line_end,
-        column_start: 0,
-        column_end: 0,
-        byte_start: 0,
-        byte_end: 0,
-        file_path: file_path.to_string(),
-        parent_index: Some(parent_idx),
-        children_indices: Vec::new(),
-        doc_comment: Some(vec![content]),
-        chunk_type: None,
-        lhs_content: None,
-        rhs_content: None,
-    }
-}
-
 fn create_chunk_section(
     file_path: &str,
     title: String,
@@ -178,7 +131,7 @@ fn create_chunk_section(
 
 /// Parse difftastic JSON output into sections
 ///
-/// Handles both array format and newline-delimited JSON (NDJSON) format.
+/// Files become non-navigable containers, hunks become navigable sections.
 ///
 /// # Errors
 ///
@@ -196,7 +149,6 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
         ));
     } else {
         // Try parsing as newline-delimited JSON (NDJSON/JSON Lines)
-        // This is what git outputs when there are multiple files
         json_str
             .lines()
             .filter(|line| !line.trim().is_empty())
@@ -215,21 +167,14 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
     let mut global_line = 0i64;
 
     for file in &files {
-        // Skip only unchanged files (show created, deleted, and changed)
+        // Skip unchanged files
         if file.status == "unchanged" {
             continue;
         }
 
-        let file_start_line = global_line;
-        sections.push(create_file_section(
-            &file.path,
-            &file.status,
-            file_start_line,
-        ));
-        let file_section_idx = sections.len() - 1;
-        global_line += 1;
+        let file_path = &file.path;
 
-        // Create hunk sections
+        // Create hunk sections directly (no file section)
         if let Some(chunks) = &file.chunks {
             for (hunk_idx, chunk) in chunks.iter().enumerate() {
                 let hunk_title = format_hunk_title(chunk, hunk_idx);
@@ -239,44 +184,53 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
                 let hunk_end_line =
                     global_line + i64::try_from(hunk_content.lines().count()).unwrap_or(0);
 
-                sections.push(create_hunk_section(
-                    &file.path,
-                    hunk_title,
-                    hunk_content,
-                    hunk_start_line,
-                    hunk_end_line,
-                    file_section_idx,
-                ));
+                // Create section for this hunk
+                sections.push(Section {
+                    title: hunk_title,
+                    level: 1, // All hunks are top-level sections
+                    line_start: hunk_start_line,
+                    line_end: hunk_end_line,
+                    column_start: 0,
+                    column_end: 0,
+                    byte_start: 0,
+                    byte_end: 0,
+                    file_path: file_path.clone(),
+                    parent_index: None,
+                    children_indices: Vec::new(),
+                    doc_comment: Some(vec![hunk_content]),
+                    chunk_type: None,
+                    lhs_content: None,
+                    rhs_content: None,
+                });
 
-                let new_section_idx = sections.len() - 1;
-                sections[file_section_idx]
-                    .children_indices
-                    .push(new_section_idx);
                 global_line = hunk_end_line + 1;
             }
         } else if file.status == "created" || file.status == "deleted" {
-            // For files with no chunks (created/deleted files without detailed hunks),
-            // create a placeholder hunk showing the status
+            // For files with no chunks (created/deleted without detailed hunks),
+            // create a single hunk showing the status
             let hunk_title = format!("File {} (no detailed diff available)", file.status);
             let hunk_content = format!("File was {}", file.status);
 
-            sections.push(create_hunk_section(
-                &file.path,
-                hunk_title,
-                hunk_content,
-                global_line,
-                global_line + 1,
-                file_section_idx,
-            ));
+            sections.push(Section {
+                title: hunk_title,
+                level: 1,
+                line_start: global_line,
+                line_end: global_line + 1,
+                column_start: 0,
+                column_end: 0,
+                byte_start: 0,
+                byte_end: 0,
+                file_path: file_path.clone(),
+                parent_index: None,
+                children_indices: Vec::new(),
+                doc_comment: Some(vec![hunk_content]),
+                chunk_type: None,
+                lhs_content: None,
+                rhs_content: None,
+            });
 
-            let new_section_idx = sections.len() - 1;
-            sections[file_section_idx]
-                .children_indices
-                .push(new_section_idx);
             global_line += 2;
         }
-
-        sections[file_section_idx].line_end = global_line;
     }
 
     Ok(sections)
