@@ -133,12 +133,31 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
-
-                    // Prepend tree prefix
                     let mut spans = vec![Span::raw(tree_prefix)];
-                    spans.append(&mut highlighted_line.spans);
+
+                    // Check if this is a difftastic hunk with proper header
+                    if section.title.contains("@@") && section.title.starts_with('(') {
+                        // Extract hunk number
+                        if let Some(close_paren) = section.title.find(')') {
+                            let hunk_num = &section.title[..=close_paren];
+                            let hunk_header = &section.title[close_paren + 1..].trim();
+
+                            spans.push(Span::raw(format!("{hunk_num} ")));
+
+                            if let Some(color) = format.get_hunk_color(&section.title) {
+                                spans.push(Span::styled(
+                                    (*hunk_header).to_string(),
+                                    Style::default().fg(color),
+                                ));
+                            } else {
+                                spans.push(Span::raw((*hunk_header).to_string()));
+                            }
+                        }
+                    } else {
+                        let mut highlighted_line =
+                            format.format_section_display(section.level, &section.title);
+                        spans.append(&mut highlighted_line.spans);
+                    }
 
                     Line::from(spans)
                 }
@@ -274,10 +293,31 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
                     let mut spans = vec![Span::raw(tree_prefix)];
-                    spans.append(&mut highlighted_line.spans);
+
+                    // Check if this is a difftastic hunk with proper header
+                    if section.title.contains("@@") && section.title.starts_with('(') {
+                        // Extract hunk number
+                        if let Some(close_paren) = section.title.find(')') {
+                            let hunk_num = &section.title[..=close_paren];
+                            let hunk_header = &section.title[close_paren + 1..].trim();
+
+                            spans.push(Span::raw(format!("{hunk_num} ")));
+
+                            if let Some(color) = format.get_hunk_color(&section.title) {
+                                spans.push(Span::styled(
+                                    (*hunk_header).to_string(),
+                                    Style::default().fg(color),
+                                ));
+                            } else {
+                                spans.push(Span::raw((*hunk_header).to_string()));
+                            }
+                        }
+                    } else {
+                        let mut highlighted_line =
+                            format.format_section_display(section.level, &section.title);
+                        spans.append(&mut highlighted_line.spans);
+                    }
                     Line::from(spans)
                 }
             };

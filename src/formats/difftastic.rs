@@ -98,6 +98,46 @@ impl Format for DifftasticFormat {
 
         Line::from(spans)
     }
+
+    fn get_hunk_color(&self, title: &str) -> Option<ratatui::style::Color> {
+        // Parse the hunk header to determine color
+        if title.contains("@@") {
+            // Extract the counts from @@ -X,Y +A,B @@
+            if let Some(hunk_part) = title.split("@@").nth(1) {
+                let parts: Vec<&str> = hunk_part.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let lhs = parts[0].trim_start_matches('-');
+                    let rhs = parts[1].trim_start_matches('+');
+                    return Some(Self::determine_hunk_color(lhs, rhs));
+                }
+            }
+        }
+        Some(Color::Yellow) // Default to yellow for modifications
+    }
+}
+
+impl DifftasticFormat {
+    /// Determine hunk color based on line counts
+    fn determine_hunk_color(lhs: &str, rhs: &str) -> Color {
+        let lhs_count = lhs
+            .split(',')
+            .nth(1)
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+        let rhs_count = rhs
+            .split(',')
+            .nth(1)
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        if lhs_count == 0 && rhs_count > 0 {
+            Color::Green // Addition
+        } else if lhs_count > 0 && rhs_count == 0 {
+            Color::Red // Deletion
+        } else {
+            Color::Yellow // Modification
+        }
+    }
 }
 
 fn create_chunk_section(
@@ -182,8 +222,8 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
                 for change in chunk {
                     hunk_counter += 1;
 
-                    // Format this individual change as a hunk
-                    let hunk_title = format_change_title(change, hunk_counter);
+                    // Format this individual change as a proper git diff hunk
+                    let hunk_title = format_hunk_header(change, hunk_counter);
                     let hunk_content = format_change_content(change);
 
                     let hunk_start_line = global_line;
@@ -243,26 +283,20 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
     Ok(sections)
 }
 
-/// Format a single change as a hunk title
-fn format_change_title(change: &DifftLine, change_num: usize) -> String {
-    match (&change.lhs, &change.rhs) {
-        (Some(lhs), Some(rhs)) if lhs.line_number == rhs.line_number => {
-            format!("Change {} (line {})", change_num, lhs.line_number)
-        }
-        (Some(lhs), Some(rhs)) => {
-            format!(
-                "Change {} (lines {}-{})",
-                change_num, lhs.line_number, rhs.line_number
-            )
-        }
-        (Some(lhs), None) => {
-            format!("Deletion {} (line {})", change_num, lhs.line_number)
-        }
-        (None, Some(rhs)) => {
-            format!("Addition {} (line {})", change_num, rhs.line_number)
-        }
-        _ => format!("Change {change_num}"),
-    }
+/// Format a change as a proper git diff hunk header
+fn format_hunk_header(change: &DifftLine, hunk_num: usize) -> String {
+    let (lhs_line, rhs_line) = match (&change.lhs, &change.rhs) {
+        (Some(lhs), Some(rhs)) => (lhs.line_number, rhs.line_number),
+        (Some(lhs), None) => (lhs.line_number, 0),
+        (None, Some(rhs)) => (0, rhs.line_number),
+        _ => (0, 0),
+    };
+
+    // Determine chunk size (for now, single line changes)
+    let lhs_count = i32::from(change.lhs.is_some());
+    let rhs_count = i32::from(change.rhs.is_some());
+
+    format!("({hunk_num}) @@ -{lhs_line},{lhs_count} +{rhs_line},{rhs_count} @@")
 }
 
 /// Format a single change for display
