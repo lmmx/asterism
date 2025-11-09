@@ -4,13 +4,13 @@
 //! The file list shows a directory tree for multi-file projects, the list view shows sections
 //! with their hierarchy, and the detail view provides a vim-like editor for section content.
 
-use crate::app_state::{AppState, FileMode, View};
+use crate::app_state::{AppState, FileMode, MoveState, View};
 use crate::config::Config;
 use crate::formats::Format;
 use edtui::{EditorTheme, EditorView, SyntaxHighlighter};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
@@ -21,12 +21,14 @@ use ratatui::{
 /// Dispatches to file list, section tree, or editor view according to navigation context.
 pub fn draw(f: &mut Frame, app: &mut AppState, _cfg: &Config) {
     match (&app.file_mode, &app.current_view) {
-        (FileMode::Multi, View::List) if app.current_view == View::List => draw_file_list(f, app),
-        _ => match app.current_view {
-            View::List => draw_list(f, app),
-            View::Detail | View::Command => draw_detail(f, app),
-            View::FileList => draw_file_list(f, app),
-        },
+        (FileMode::Multi, View::FileList) => draw_file_list(f, app),
+        (_, View::List) => draw_list(f, app),
+        (_, View::Command) => {
+            // Draw list view but with command prompt
+            draw_list_with_command(f, app);
+        }
+        (_, View::Detail) => draw_detail(f, app),
+        (_, View::FileList) => draw_file_list(f, app),
     }
 }
 
@@ -86,23 +88,114 @@ fn draw_list(f: &mut Frame, app: &AppState) {
             spans.extend(highlighted_line.spans);
             let line = Line::from(spans);
 
-            let item = if i == app.current_section_index {
-                ListItem::new(line).style(Style::default().add_modifier(Modifier::REVERSED))
+            // Determine style based on move state
+            let style = if Some(i) == app.moving_section_index {
+                match app.move_state {
+                    MoveState::Selected => Style::default()
+                        .fg(Color::Rgb(255, 165, 0)) // Orange
+                        .add_modifier(Modifier::BOLD),
+                    MoveState::Moved => {
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                    }
+                    MoveState::None => {
+                        if i == app.current_section_index {
+                            Style::default().add_modifier(Modifier::REVERSED)
+                        } else {
+                            Style::default()
+                        }
+                    }
+                }
+            } else if i == app.current_section_index {
+                Style::default().add_modifier(Modifier::REVERSED)
             } else {
-                ListItem::new(line)
+                Style::default()
             };
 
-            item
+            ListItem::new(line).style(style)
         })
         .collect();
 
-    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sections"));
+    let title = if app.move_state == MoveState::None {
+        "Sections"
+    } else {
+        "Sections (MOVING)"
+    };
+
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title(title));
 
     f.render_widget(list, chunks[0]);
 
-    let help = Paragraph::new("↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | q: Quit")
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(help, chunks[1]);
+    let help = if app.move_state == MoveState::None {
+        "↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | Ctrl+↑: Start Move | q: Quit"
+    } else {
+        "Ctrl+↑/↓: Move | Ctrl+←/→: Level | Ctrl+Home/End: Top/Bottom | :w Save | Esc: Cancel"
+    };
+
+    let help_widget = Paragraph::new(help).block(Block::default().borders(Borders::ALL));
+    f.render_widget(help_widget, chunks[1]);
+}
+
+fn draw_list_with_command(f: &mut Frame, app: &AppState) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(3)])
+        .split(f.area());
+
+    let format = crate::formats::markdown::MarkdownFormat;
+
+    let items: Vec<ListItem> = app
+        .sections
+        .iter()
+        .enumerate()
+        .map(|(i, section)| {
+            let indent = "  ".repeat(section.level.saturating_sub(1));
+            let highlighted_line = format.format_section_display(section.level, &section.title);
+
+            let mut spans = vec![Span::raw(indent)];
+            spans.extend(highlighted_line.spans);
+            let line = Line::from(spans);
+
+            let style = if Some(i) == app.moving_section_index {
+                match app.move_state {
+                    MoveState::Selected => Style::default()
+                        .fg(Color::Rgb(255, 165, 0))
+                        .add_modifier(Modifier::BOLD),
+                    MoveState::Moved => {
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                    }
+                    MoveState::None => {
+                        if i == app.current_section_index {
+                            Style::default().add_modifier(Modifier::REVERSED)
+                        } else {
+                            Style::default()
+                        }
+                    }
+                }
+            } else if i == app.current_section_index {
+                Style::default().add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+
+            ListItem::new(line).style(style)
+        })
+        .collect();
+
+    let title = if app.move_state == MoveState::None {
+        "Sections"
+    } else {
+        "Sections (MOVING)"
+    };
+
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title(title));
+
+    f.render_widget(list, chunks[0]);
+
+    // Show command buffer instead of help
+    let command_text = format!(":{}", app.command_buffer);
+    let command_widget =
+        Paragraph::new(command_text).block(Block::default().borders(Borders::ALL).title("Command"));
+    f.render_widget(command_widget, chunks[1]);
 }
 
 fn draw_detail(f: &mut Frame, app: &mut AppState) {

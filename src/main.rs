@@ -146,7 +146,14 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Up => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Up: Start move or move up
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
+                                app.move_section_up();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Up: Jump to previous sibling at same level
                             if let Some(prev_sibling) = app.navigate_to_prev_sibling() {
                                 app.current_section_index = prev_sibling;
@@ -159,7 +166,14 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Down => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Down: Start move (if not moving) or move down
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
+                                app.move_section_down();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Down: Jump to next sibling at same level
                             if let Some(next_sibling) = app.navigate_to_next_sibling() {
                                 app.current_section_index = next_sibling;
@@ -171,19 +185,33 @@ fn run_app<B: ratatui::backend::Backend>(
                             }
                         }
                     }
-                    KeyCode::Char('h') | KeyCode::Left => {
-                        if let Some(parent_idx) = app.navigate_to_parent() {
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Left: Decrease level (move out)
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_out();
+                            }
+                        } else if let Some(parent_idx) = app.navigate_to_parent() {
                             app.current_section_index = parent_idx;
                         }
                     }
-                    KeyCode::Char('l') | KeyCode::Right => {
-                        // Try to find any descendant, not just immediate child
-                        if let Some(descendant_idx) = app.navigate_to_next_descendant() {
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Right: Increase level (move in)
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_in();
+                            }
+                        } else if let Some(descendant_idx) = app.navigate_to_next_descendant() {
                             app.current_section_index = descendant_idx;
                         }
                     }
                     KeyCode::Home => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+Home: Move to top
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_to_top();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+Home: Jump to first section at same level
                             if let Some(first_at_level) = app.navigate_to_first_at_level() {
                                 app.current_section_index = first_at_level;
@@ -196,7 +224,12 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::End => {
-                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            // Ctrl+End: Move to bottom
+                            if app.move_state != app_state::MoveState::None {
+                                app.move_section_to_bottom();
+                            }
+                        } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             // Shift+End: Jump to last section at same level
                             if let Some(last_at_level) = app.navigate_to_last_at_level() {
                                 app.current_section_index = last_at_level;
@@ -208,8 +241,22 @@ fn run_app<B: ratatui::backend::Backend>(
                             }
                         }
                     }
+                    KeyCode::Esc => {
+                        if app.move_state != app_state::MoveState::None {
+                            app.cancel_move();
+                        }
+                    }
+                    KeyCode::Char(':') => {
+                        // Allow entering command mode from move state to save
+                        app.current_view = app_state::View::Command;
+                        app.command_buffer.clear();
+                        app.message = None;
+                    }
                     KeyCode::Enter => {
-                        app.enter_detail_view();
+                        // Don't enter detail view while moving
+                        if app.move_state == app_state::MoveState::None {
+                            app.enter_detail_view();
+                        }
                     }
                     _ => {}
                 },
@@ -251,44 +298,74 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Enter => {
                         let cmd = app.command_buffer.clone();
-                        app.current_view = app_state::View::Detail;
+                        app.current_view = app_state::View::List; // Always return to List view
 
                         match cmd.as_str() {
                             "w" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
+                                if app.move_state == app_state::MoveState::Moved {
+                                    if let Err(e) = app.save_section_reorder() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else if app.editor_state.is_some() {
+                                    // Only save current section if we're in the editor
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else {
+                                    app.message = Some("Nothing to save".to_string());
                                 }
                             }
                             "x" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else {
-                                    app.exit_detail_view(true);
+                                if app.move_state == app_state::MoveState::Moved {
+                                    if let Err(e) = app.save_section_reorder() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else {
+                                        app.exit_detail_view(true);
+                                    }
                                 }
                             }
                             "q" | "q!" => {
-                                app.exit_detail_view(false);
+                                if app.editor_state.is_some() {
+                                    app.exit_detail_view(false);
+                                } else if app.move_state != app_state::MoveState::None {
+                                    app.cancel_move();
+                                } else {
+                                    // Quit application logic
+                                    if app.file_mode == app_state::FileMode::Multi {
+                                        app.current_view = app_state::View::FileList;
+                                    } else {
+                                        return Ok(());
+                                    }
+                                }
                             }
                             "wn" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else if let Some(next) = app.find_next_section() {
-                                    app.exit_detail_view(true);
-                                    app.current_section_index = next;
-                                    app.enter_detail_view();
-                                } else {
-                                    app.message = Some("No more sections".to_string());
+                                if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else if let Some(next) = app.find_next_section() {
+                                        app.exit_detail_view(true);
+                                        app.current_section_index = next;
+                                        app.enter_detail_view();
+                                    } else {
+                                        app.message = Some("No more sections".to_string());
+                                    }
                                 }
                             }
                             "wp" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else if let Some(prev) = app.find_prev_section() {
-                                    app.exit_detail_view(true);
-                                    app.current_section_index = prev;
-                                    app.enter_detail_view();
-                                } else {
-                                    app.message = Some("No previous sections".to_string());
+                                if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else if let Some(prev) = app.find_prev_section() {
+                                        app.exit_detail_view(true);
+                                        app.current_section_index = prev;
+                                        app.enter_detail_view();
+                                    } else {
+                                        app.message = Some("No previous sections".to_string());
+                                    }
                                 }
                             }
                             _ => {
@@ -298,7 +375,7 @@ fn run_app<B: ratatui::backend::Backend>(
                         app.command_buffer.clear();
                     }
                     KeyCode::Esc => {
-                        app.current_view = app_state::View::Detail;
+                        app.current_view = app_state::View::List; // Return to List view, not Detail
                         app.command_buffer.clear();
                     }
                     _ => {}
