@@ -51,8 +51,4 @@ impl Format for MarkdownFormat {
 
         Line::from(spans)
     }
-
-    fn get_hunk_color(&self, _title: &str) -> Option<ratatui::style::Color> {
-        None // Markdown doesn't use hunk colors
-    }
 }

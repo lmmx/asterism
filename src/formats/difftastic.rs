@@ -85,6 +85,41 @@ impl Format for DifftasticFormat {
     }
 
     fn format_section_display(&self, level: usize, title: &str) -> Line<'static> {
+        // Check if this is a file creation/deletion message
+        if title.contains("File created") {
+            let spans = vec![Span::styled(
+                title.to_string(),
+                Style::default().fg(Color::Green),
+            )];
+            return Line::from(spans);
+        } else if title.contains("File deleted") || title.contains("File was deleted") {
+            let spans = vec![Span::styled(
+                title.to_string(),
+                Style::default().fg(Color::Red),
+            )];
+            return Line::from(spans);
+        }
+
+        // Check if this is a hunk header with format: (N) @@ -X,Y +A,B @@
+        if title.contains("@@") && title.starts_with('(') {
+            if let Some(close_paren) = title.find(')') {
+                let hunk_num = &title[..=close_paren];
+                let rest = &title[close_paren + 1..].trim();
+
+                // Determine color based on the diff header
+                let color = Self::determine_hunk_color_from_header(rest);
+
+                let spans = vec![
+                    Span::styled(hunk_num.to_string(), Style::default().fg(color)),
+                    Span::raw(" "),
+                    Span::raw(rest.to_string()),
+                ];
+
+                return Line::from(spans);
+            }
+        }
+
+        // For file nodes or other sections
         let color = if level == 0 {
             Color::Cyan // Files
         } else {
@@ -98,45 +133,37 @@ impl Format for DifftasticFormat {
 
         Line::from(spans)
     }
-
-    fn get_hunk_color(&self, title: &str) -> Option<ratatui::style::Color> {
-        // Parse the hunk header to determine color
-        if title.contains("@@") {
-            // Extract the counts from @@ -X,Y +A,B @@
-            if let Some(hunk_part) = title.split("@@").nth(1) {
-                let parts: Vec<&str> = hunk_part.split_whitespace().collect();
-                if parts.len() >= 2 {
-                    let lhs = parts[0].trim_start_matches('-');
-                    let rhs = parts[1].trim_start_matches('+');
-                    return Some(Self::determine_hunk_color(lhs, rhs));
-                }
-            }
-        }
-        Some(Color::Yellow) // Default to yellow for modifications
-    }
 }
 
 impl DifftasticFormat {
-    /// Determine hunk color based on line counts
-    fn determine_hunk_color(lhs: &str, rhs: &str) -> Color {
-        let lhs_count = lhs
-            .split(',')
-            .nth(1)
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-        let rhs_count = rhs
-            .split(',')
-            .nth(1)
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
+    /// Determine hunk color from the header string itself
+    fn determine_hunk_color_from_header(header: &str) -> Color {
+        // Parse @@ -X,Y +A,B @@
+        if let Some(hunk_part) = header.strip_prefix("@@").and_then(|s| s.split("@@").next()) {
+            let parts: Vec<&str> = hunk_part.trim().split_whitespace().collect();
+            if parts.len() >= 2 {
+                let lhs = parts[0].trim_start_matches('-');
+                let rhs = parts[1].trim_start_matches('+');
 
-        if lhs_count == 0 && rhs_count > 0 {
-            Color::Green // Addition
-        } else if lhs_count > 0 && rhs_count == 0 {
-            Color::Red // Deletion
-        } else {
-            Color::Yellow // Modification
+                let lhs_count = lhs
+                    .split(',')
+                    .nth(1)
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(1);
+                let rhs_count = rhs
+                    .split(',')
+                    .nth(1)
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(1);
+
+                if lhs_count == 0 && rhs_count > 0 {
+                    return Color::Green; // Addition
+                } else if lhs_count > 0 && rhs_count == 0 {
+                    return Color::Red; // Deletion
+                }
+            }
         }
+        Color::Yellow // Modification
     }
 }
 
@@ -255,7 +282,7 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
         } else if file.status == "created" || file.status == "deleted" {
             // For files with no chunks (created/deleted without detailed hunks),
             // create a single hunk showing the status
-            let hunk_title = format!("File {} (no detailed diff available)", file.status);
+            let hunk_title = format!("(1) File {}", file.status);
             let hunk_content = format!("File was {}", file.status);
 
             sections.push(Section {

@@ -22,6 +22,4 @@ pub trait Format {
     fn title_query(&self) -> &str;
     /// Format a section heading for display with syntax highlighting
     fn format_section_display(&self, level: usize, title: &str) -> ratatui::text::Line<'static>;
-    /// Get the color for a hunk based on change type (for diff formats)
-    fn get_hunk_color(&self, title: &str) -> Option<ratatui::style::Color>;
 }
