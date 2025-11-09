@@ -33,14 +33,18 @@ fn get_tree_prefix(level: usize, is_last: bool, parent_states: &[bool]) -> Strin
 
     let mut prefix = String::new();
 
-    // Draw vertical lines for parent levels
+    // Draw indentation and vertical lines for parent levels
     for i in 0..level.saturating_sub(1) {
+        prefix.push_str("  "); // Two spaces for indentation
         if i < parent_states.len() && parent_states[i] {
-            prefix.push_str("│   ");
+            prefix.push_str("│ ");
         } else {
-            prefix.push_str("    ");
+            prefix.push_str("  ");
         }
     }
+
+    // Add final indentation before the branch
+    prefix.push_str("  ");
 
     // Draw branch for current level
     if is_last {
@@ -151,12 +155,15 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
+                    // Calculate indentation based on section level
+                    let indent = "  ".repeat(section.level.saturating_sub(1));
+
                     let mut highlighted_line = format
                         .as_ref()
                         .format_section_display(section.level, &section.title);
 
-                    // Prepend tree prefix
-                    let mut spans = vec![Span::raw(tree_prefix)];
+                    // Prepend indent + tree prefix
+                    let mut spans = vec![Span::raw(indent), Span::raw(tree_prefix)];
                     spans.append(&mut highlighted_line.spans);
 
                     Line::from(spans)
