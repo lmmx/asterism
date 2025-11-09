@@ -69,24 +69,37 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         Box::new(crate::formats::markdown::MarkdownFormat)
     };
 
-    // Calculate which nodes are last at their level for box-drawing
+    // Calculate which nodes are last children of their parent for box-drawing
     let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
-    for (i, node) in app.tree_nodes.iter().enumerate() {
-        let current_level = node.tree_level;
+    for i in 0..app.tree_nodes.len() {
+        // A node is "last" if there's no subsequent sibling (same parent, same tree_level)
+        let current_level = app.tree_nodes[i].tree_level;
+        let current_parent = app.tree_nodes[i]
+            .section_index
+            .and_then(|idx| app.sections[idx].parent_index);
 
-        // Check if there's another node at the same level after this one
-        let mut found_next = false;
+        let mut has_sibling_after = false;
         for j in (i + 1)..app.tree_nodes.len() {
-            if app.tree_nodes[j].tree_level < current_level {
-                break; // Moved up a level
-            }
-            if app.tree_nodes[j].tree_level == current_level {
-                found_next = true;
+            let next_level = app.tree_nodes[j].tree_level;
+
+            // If we encounter a node at a lower tree level, stop searching
+            if next_level < current_level {
                 break;
+            }
+
+            // If same tree level, check if it's a sibling (same parent)
+            if next_level == current_level {
+                let next_parent = app.tree_nodes[j]
+                    .section_index
+                    .and_then(|idx| app.sections[idx].parent_index);
+                if next_parent == current_parent {
+                    has_sibling_after = true;
+                    break;
+                }
             }
         }
 
-        is_last_at_level[i] = !found_next;
+        is_last_at_level[i] = !has_sibling_after;
     }
 
     // Track which parent levels still have siblings coming
