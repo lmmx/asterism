@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/lmmx/asterism/compare/asterism-v0.3.0...asterism-v0.3.1) - 2025-11-09
+
+### <!-- 2 -->Bug Fixes
+
+- *(oops)* out/in were swapped
+
 ## [0.3.0](https://github.com/lmmx/asterism/compare/asterism-v0.1.4...asterism-v0.3.0) - 2025-11-09
 
 ### <!-- 4 -->Documentation
