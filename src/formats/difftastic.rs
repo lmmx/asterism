@@ -104,14 +104,22 @@ impl Format for DifftasticFormat {
 ///
 /// Returns an error if JSON parsing fails or if the format is invalid.
 pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
-    let files: Vec<DifftFile> = serde_json::from_str(json_str)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    // Try parsing as array first (multi-file output)
+    let files: Vec<DifftFile> = if let Ok(files) = serde_json::from_str::<Vec<DifftFile>>(json_str)
+    {
+        files
+    } else {
+        // Try parsing as single object (git diff output)
+        let file: DifftFile = serde_json::from_str(json_str)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        vec![file]
+    };
 
     let mut sections = Vec::new();
     let mut global_line = 0i64;
 
     for file in &files {
-        // Skip unchanged files
+        // Skip files without chunks
         if file.chunks.is_none() || file.status == "unchanged" {
             continue;
         }
@@ -272,3 +280,7 @@ fn format_hunk_content(chunk: &[DifftLine]) -> String {
 
     output
 }
+
+#[cfg(test)]
+#[path = "../tests/difftastic.rs"]
+mod tests;
