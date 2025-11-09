@@ -60,3 +60,37 @@ pub fn highlight_source_lines(
 
     display_lines
 }
+
+/// Highlight a single line with syntax coloring for a given file extension.
+///
+/// Falls back to plain text rendering if syntax highlighting fails.
+pub fn highlight_line_with_extension(line: &str, extension: &str) -> Line<'static> {
+    let theme = &THEME_SET.themes["base16-eighties.dark"];
+    let syntax_ref = SYNTAX_SET
+        .find_syntax_by_extension(extension)
+        .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
+
+    let mut highlight_lines = HighlightLines::new(syntax_ref, theme);
+
+    // Try to highlight, fall back to plain text if it fails
+    match highlight_lines.highlight_line(line, &SYNTAX_SET) {
+        Ok(highlighted) => {
+            let mut spans = Vec::new();
+            for (style, text) in highlighted {
+                spans.push(Span::styled(
+                    text.to_string(),
+                    Style::default().fg(Color::Rgb(
+                        style.foreground.r,
+                        style.foreground.g,
+                        style.foreground.b,
+                    )),
+                ));
+            }
+            Line::from(spans)
+        }
+        Err(_) => {
+            // Fall back to plain text if highlighting fails
+            Line::from(line.to_string())
+        }
+    }
+}

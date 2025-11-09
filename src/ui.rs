@@ -6,10 +6,12 @@
 
 use crate::app_state::{AppState, FileMode, View};
 use crate::config::Config;
+use crate::formats::Format;
 use edtui::{EditorTheme, EditorView, SyntaxHighlighter};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -69,24 +71,28 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(f.area());
 
+    let format = crate::formats::markdown::MarkdownFormat;
+
     let items: Vec<ListItem> = app
         .sections
         .iter()
         .enumerate()
         .map(|(i, section)| {
             let indent = "  ".repeat(section.level.saturating_sub(1));
-            let prefix = "#".repeat(section.level);
-            let text = format!("{}{} {}", indent, prefix, section.title);
+            let highlighted_line = format.format_section_display(section.level, &section.title);
 
-            let style = if i == app.current_section_index {
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::REVERSED)
+            // Prepend indent as plain text
+            let mut spans = vec![Span::raw(indent)];
+            spans.extend(highlighted_line.spans);
+            let line = Line::from(spans);
+
+            let item = if i == app.current_section_index {
+                ListItem::new(line).style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
-                Style::default().fg(Color::White)
+                ListItem::new(line)
             };
 
-            ListItem::new(text).style(style)
+            item
         })
         .collect();
 
