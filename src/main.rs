@@ -167,8 +167,10 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Down => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Down: Move down
-                            if app.move_state != app_state::MoveState::None {
+                            // Ctrl+Down: Start move (if not moving) or move down
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
                                 app.move_section_down();
                             }
                         } else if key.modifiers.contains(event::KeyModifiers::SHIFT) {
@@ -183,7 +185,7 @@ fn run_app<B: ratatui::backend::Backend>(
                             }
                         }
                     }
-                    KeyCode::Left => {
+                    KeyCode::Left | KeyCode::Char('h') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
                             // Ctrl+Left: Decrease level (move out)
                             if app.move_state != app_state::MoveState::None {
@@ -193,7 +195,7 @@ fn run_app<B: ratatui::backend::Backend>(
                             app.current_section_index = parent_idx;
                         }
                     }
-                    KeyCode::Right => {
+                    KeyCode::Right | KeyCode::Char('l') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
                             // Ctrl+Right: Increase level (move in)
                             if app.move_state != app_state::MoveState::None {
@@ -245,10 +247,15 @@ fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Char(':') => {
-                        if app.move_state != app_state::MoveState::None {
-                            app.current_view = app_state::View::Command;
-                            app.command_buffer.clear();
-                            app.message = None;
+                        // Allow entering command mode from move state to save
+                        app.current_view = app_state::View::Command;
+                        app.command_buffer.clear();
+                        app.message = None;
+                    }
+                    KeyCode::Enter => {
+                        // Don't enter detail view while moving
+                        if app.move_state == app_state::MoveState::None {
+                            app.enter_detail_view();
                         }
                     }
                     _ => {}
