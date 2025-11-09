@@ -126,7 +126,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
     f.render_widget(list, chunks[0]);
 
     let help = if app.move_state == MoveState::None {
-        "↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | Ctrl+↑: Start Move | q: Quit"
+        "↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | Ctrl+↑/↓: Start Move | q: Quit"
     } else {
         "Ctrl+↑/↓: Move | Ctrl+←/→: Level | Ctrl+Home/End: Top/Bottom | :w Save | Esc: Cancel"
     };
