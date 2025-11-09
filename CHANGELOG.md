@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4](https://github.com/lmmx/asterism/compare/asterism-v0.5.3...asterism-v0.5.4) - 2025-11-09
+
+### <!-- 2 -->Bug Fixes
+
+- remove file status for non-hunk header titles
+
+### <!-- 4 -->Documentation
+
+- update screenshot
+
 ## [0.5.3](https://github.com/lmmx/asterism/compare/asterism-v0.5.2...asterism-v0.5.3) - 2025-11-09
 
 ### <!-- 4 -->Documentation
