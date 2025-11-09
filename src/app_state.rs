@@ -129,6 +129,7 @@ impl AppState {
         } else if is_difftastic {
             // Difftastic mode: group sections by file, show files as non-navigable nodes
             let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
+            let mut file_status: HashMap<String, String> = HashMap::new();
 
             // Group sections by file
             for (idx, section) in sections.iter().enumerate() {
@@ -136,6 +137,17 @@ impl AppState {
                     .entry(section.file_path.clone())
                     .or_default()
                     .push((idx, section));
+
+                // Determine file status from hunk headers
+                if !file_status.contains_key(&section.file_path) {
+                    if section.title.contains("@@ -0,0") {
+                        file_status.insert(section.file_path.clone(), "created".to_string());
+                    } else if section.title.contains("+0,0 @@") {
+                        file_status.insert(section.file_path.clone(), "deleted".to_string());
+                    } else {
+                        file_status.insert(section.file_path.clone(), "changed".to_string());
+                    }
+                }
             }
 
             // Build tree with file nodes and hunk sections
@@ -148,18 +160,7 @@ impl AppState {
                     .file_name()
                     .map_or_else(|| file_path.clone(), |n| n.to_string_lossy().to_string());
 
-                // Determine status from first section (they're all from same file)
-                let status = if let Some((_, first_section)) = file_tree[file_path].first() {
-                    if first_section.title.contains("created") {
-                        "created"
-                    } else if first_section.title.contains("deleted") {
-                        "deleted"
-                    } else {
-                        "changed"
-                    }
-                } else {
-                    "changed"
-                };
+                let status = file_status.get(file_path).map_or("changed", String::as_str);
 
                 nodes.push(TreeNode::file(
                     format!("{file_name} ({status})"),
