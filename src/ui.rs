@@ -26,7 +26,7 @@ pub fn draw(f: &mut Frame, app: &mut AppState, _cfg: &Config) {
 }
 
 /// Generate box-drawing prefix for tree structure
-fn get_tree_prefix(level: usize, is_last: bool, parent_states: &[bool]) -> String {
+fn get_tree_prefix(level: usize, parent_states: &[bool]) -> String {
     if level == 0 {
         return String::new();
     }
@@ -47,11 +47,7 @@ fn get_tree_prefix(level: usize, is_last: bool, parent_states: &[bool]) -> Strin
     prefix.push_str("  ");
 
     // Draw branch for current level
-    if is_last {
-        prefix.push_str("└── ");
-    } else {
-        prefix.push_str("├── ");
-    }
+    prefix.push_str("   ");
 
     prefix
 }
@@ -73,15 +69,16 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         Box::new(crate::formats::markdown::MarkdownFormat)
     };
 
+    let mut is_last_at_level = vec![false; app.tree_nodes.len()];
+
     // Calculate which nodes are last children of their parent for box-drawing
-    let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
-    for i in 0..app.tree_nodes.len() {
+    for (i, node) in app.tree_nodes.iter().enumerate() {
         // A node is "last" if there's no subsequent sibling (same parent, same tree_level)
-        let current_level = app.tree_nodes[i].tree_level;
-        let current_parent = app.tree_nodes[i]
+        let current_parent = node
             .section_index
             .and_then(|idx| app.sections[idx].parent_index);
 
+        let current_level = node.tree_level;
         let mut has_sibling_after = false;
         for j in (i + 1)..app.tree_nodes.len() {
             let next_level = app.tree_nodes[j].tree_level;
@@ -126,8 +123,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                 parent_has_siblings[parent_idx] = !is_last_at_level[i];
             }
 
-            let tree_prefix =
-                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings);
+            let tree_prefix = get_tree_prefix(node.tree_level, &parent_has_siblings);
 
             let line = match &node.node_type {
                 NodeType::Directory { name, .. } => {
@@ -146,7 +142,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {name}"),
+                            format!("  📄 {name}"),
                             Style::default()
                                 .fg(Color::Blue)
                                 .add_modifier(Modifier::BOLD),
@@ -277,7 +273,7 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
             }
 
             let tree_prefix = if app.file_mode == crate::app_state::FileMode::Multi {
-                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings)
+                get_tree_prefix(node.tree_level, &parent_has_siblings)
             } else {
                 String::new()
             };
@@ -299,7 +295,7 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {name}"),
+                            format!("  📄 {name}"),
                             Style::default()
                                 .fg(Color::Blue)
                                 .add_modifier(Modifier::BOLD),
