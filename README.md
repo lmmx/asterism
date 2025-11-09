@@ -7,16 +7,17 @@
 
 Hyperbolic navigation for tree data
 
+![You are here](https://github.com/user-attachments/assets/b39e2c66-4793-42c6-a7ab-71afe10b0095)
+
+
+> You are here
+
 ## vim-like document section editor
 
 asterism uses ratatui to give a hierarchical tree navigator for markdown documents,
 and [edtui][edtui] to emulate a vim editor in which to edit section content.
 
 [edtui]: https://github.com/preiter93/edtui
-
-![You are here](https://github.com/user-attachments/assets/35b0e7b5-66dd-410b-9625-98ae858bebe3)
-
-> You are here
 
 ## Features
 
