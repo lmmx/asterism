@@ -129,9 +129,9 @@ impl AppState {
         } else if is_difftastic {
             // Difftastic mode: group sections by file, show files as non-navigable nodes
             let mut file_tree: HashMap<String, Vec<(usize, &Section)>> = HashMap::new();
-            let mut file_status: HashMap<String, String> = HashMap::new();
+            let mut file_status: HashMap<String, Option<String>> = HashMap::new();
 
-            // Group sections by file
+            // Group sections by file and infer file statuses
             for (idx, section) in sections.iter().enumerate() {
                 file_tree
                     .entry(section.file_path.clone())
@@ -140,13 +140,16 @@ impl AppState {
 
                 // Determine file status from hunk headers
                 if !file_status.contains_key(&section.file_path) {
-                    if section.title.contains("@@ -0,0") {
-                        file_status.insert(section.file_path.clone(), "created".to_string());
+                    let status = if section.title.contains("@@ -0,0") {
+                        Some("created".to_string())
                     } else if section.title.contains("+0,0 @@") {
-                        file_status.insert(section.file_path.clone(), "deleted".to_string());
+                        Some("deleted".to_string())
+                    } else if section.title.contains("@@ ") {
+                        Some("changed".to_string())
                     } else {
-                        file_status.insert(section.file_path.clone(), "changed".to_string());
-                    }
+                        None
+                    };
+                    file_status.insert(section.file_path.clone(), status);
                 }
             }
 
@@ -160,13 +163,14 @@ impl AppState {
                     .file_name()
                     .map_or_else(|| file_path.clone(), |n| n.to_string_lossy().to_string());
 
-                let status = file_status.get(file_path).map_or("changed", String::as_str);
+                let status_opt = file_status.get(file_path).and_then(|opt| opt.as_deref()); // flatten Option<Option<&str>>
 
-                nodes.push(TreeNode::file(
-                    format!("{file_name} ({status})"),
-                    file_path.clone(),
-                    0,
-                ));
+                let label = match status_opt {
+                    Some(status) => format!("{file_name} ({status})"),
+                    None => file_name.clone(),
+                };
+
+                nodes.push(TreeNode::file(label, file_path.clone(), 0));
 
                 // Add hunk sections under this file
                 if let Some(file_sections) = file_tree.get(file_path) {
@@ -199,7 +203,7 @@ impl AppState {
                     .file_name()
                     .map_or_else(|| path_str.clone(), |n| n.to_string_lossy().to_string());
 
-                nodes.push(TreeNode::file(file_name, path_str.clone(), 0));
+                nodes.push(TreeNode::file(file_name.clone(), path_str.clone(), 0));
 
                 // Add sections under this file
                 if let Some(file_sections) = file_tree.get(&path_str) {
