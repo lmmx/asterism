@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "asterism"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "clap",
  "edtui",
