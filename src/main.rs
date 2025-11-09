@@ -187,8 +187,10 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Left: Decrease level (move in)
-                            if app.move_state != app_state::MoveState::None {
+                            // Ctrl+Left: Start move or decrease level (move in)
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
                                 app.move_section_in();
                             }
                         } else if let Some(parent_idx) = app.navigate_to_parent() {
@@ -197,8 +199,10 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                            // Ctrl+Right: Increase level (move in)
-                            if app.move_state != app_state::MoveState::None {
+                            // Ctrl+Right: Start move or increase level (move out)
+                            if app.move_state == app_state::MoveState::None {
+                                app.start_move();
+                            } else {
                                 app.move_section_out();
                             }
                         } else if let Some(descendant_idx) = app.navigate_to_next_descendant() {

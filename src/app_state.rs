@@ -45,7 +45,7 @@ pub enum FileMode {
 ///
 /// # State Transitions
 ///
-/// - **None → Selected**: Triggered by `Ctrl+↑/↓` on a section
+/// - **None → Selected**: Triggered by `Ctrl+↑/↓/←/→` on a section
 /// - **Selected → Moved**: Any move operation (up/down/level change)
 /// - **Moved → None**: Successful save (`:w`) or cancel (`Esc`)
 /// - **Selected → None**: Cancel before any moves
@@ -55,13 +55,13 @@ pub enum MoveState {
     /// In this state, all keybindings operate in their default navigation mode:
     /// - `↑/↓` move the cursor between sections
     /// - `←/→` navigate parent/child relationships
-    /// - `Ctrl+↑/↓` initiates a move operation
+    /// - `Ctrl+↑/↓/←/→` initiates a move operation
     ///
     /// This is the default state and the state returned to after save or cancel.
     None,
     /// A section has been selected for moving but no changes made yet.
     ///
-    /// Triggered by pressing `Ctrl+↑/↓` while in the `None` state. The selected section
+    /// Triggered by pressing `Ctrl+↑/↓/←/→` while in the `None` state. The selected section
     /// displays in orange to indicate it's ready to be repositioned. In this state:
     /// - `Ctrl+↑/↓` move the section up or down
     /// - `Ctrl+←/→` change the section's heading level
@@ -91,7 +91,7 @@ pub enum MoveState {
     /// # Example
     ///
     /// ```text
-    /// ## Background <- MOVED (red, after Ctrl+↑/↓ from position 2)
+    /// ## Background <- MOVED (red, after Ctrl+↑/↓/←/→ from position 2)
     /// # Introduction <- normal (was above, now below)
     /// ## Methods <- normal
     /// ```

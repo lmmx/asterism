@@ -61,7 +61,7 @@ asterism README.md
 
 #### Section Reordering
 
-- <kbd>Ctrl</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd>: Activate move mode (section turns orange), then move section up/down
+- <kbd>Ctrl</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>←</kbd>/<kbd>→</kbd>: Activate move mode (section turns orange), then move section up/down/in/out
 - <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd>: Change heading level (dedent/indent)
 - <kbd>Ctrl</kbd> + <kbd>Home</kbd>/<kbd>End</kbd>: Move section to top/bottom of document
 - <kbd>:w</kbd>: Save reordered structure to disk
