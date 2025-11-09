@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5](https://github.com/lmmx/asterism/compare/asterism-v0.5.4...asterism-v0.5.5) - 2025-11-09
+
+### <!-- 9 -->Other
+
+- bump edtui
+
 ## [0.5.4](https://github.com/lmmx/asterism/compare/asterism-v0.5.3...asterism-v0.5.4) - 2025-11-09
 
 ### <!-- 2 -->Bug Fixes
