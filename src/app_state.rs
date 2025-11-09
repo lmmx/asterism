@@ -122,9 +122,9 @@ impl AppState {
         let is_difftastic = file_section_counts.values().any(|&count| count > 1);
 
         if files.len() == 1 && !is_difftastic {
-            // Single markdown file mode: just show sections with their heading hierarchy
+            // Single markdown file mode: use section level for tree indentation
             for (idx, section) in sections.iter().enumerate() {
-                nodes.push(TreeNode::section(section.clone(), section.level - 1, idx));
+                nodes.push(TreeNode::section(section.clone(), section.level, idx));
             }
         } else if is_difftastic {
             // Difftastic mode: group sections by file, show files as non-navigable nodes

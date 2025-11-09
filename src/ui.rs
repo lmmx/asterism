@@ -26,28 +26,28 @@ pub fn draw(f: &mut Frame, app: &mut AppState, _cfg: &Config) {
 }
 
 /// Generate box-drawing prefix for tree structure
-fn get_tree_prefix(level: usize, is_last: bool, parent_states: &[bool]) -> String {
+fn get_tree_prefix(level: usize, parent_states: &[bool]) -> String {
     if level == 0 {
         return String::new();
     }
 
     let mut prefix = String::new();
 
-    // Draw vertical lines for parent levels
+    // Draw indentation and vertical lines for parent levels
     for i in 0..level.saturating_sub(1) {
+        prefix.push_str("  "); // Two spaces for indentation
         if i < parent_states.len() && parent_states[i] {
-            prefix.push_str("│   ");
+            prefix.push_str("│ ");
         } else {
-            prefix.push_str("    ");
+            prefix.push_str("  ");
         }
     }
 
+    // Add final indentation before the branch
+    prefix.push_str("  ");
+
     // Draw branch for current level
-    if is_last {
-        prefix.push_str("└── ");
-    } else {
-        prefix.push_str("├── ");
-    }
+    prefix.push_str("   ");
 
     prefix
 }
@@ -69,24 +69,38 @@ fn draw_list(f: &mut Frame, app: &AppState) {
         Box::new(crate::formats::markdown::MarkdownFormat)
     };
 
-    // Calculate which nodes are last at their level for box-drawing
-    let mut is_last_at_level: Vec<bool> = vec![false; app.tree_nodes.len()];
-    for (i, node) in app.tree_nodes.iter().enumerate() {
-        let current_level = node.tree_level;
+    let mut is_last_at_level = vec![false; app.tree_nodes.len()];
 
-        // Check if there's another node at the same level after this one
-        let mut found_next = false;
+    // Calculate which nodes are last children of their parent for box-drawing
+    for (i, node) in app.tree_nodes.iter().enumerate() {
+        // A node is "last" if there's no subsequent sibling (same parent, same tree_level)
+        let current_parent = node
+            .section_index
+            .and_then(|idx| app.sections[idx].parent_index);
+
+        let current_level = node.tree_level;
+        let mut has_sibling_after = false;
         for j in (i + 1)..app.tree_nodes.len() {
-            if app.tree_nodes[j].tree_level < current_level {
-                break; // Moved up a level
-            }
-            if app.tree_nodes[j].tree_level == current_level {
-                found_next = true;
+            let next_level = app.tree_nodes[j].tree_level;
+
+            // If we encounter a node at a lower tree level, stop searching
+            if next_level < current_level {
                 break;
+            }
+
+            // If same tree level, check if it's a sibling (same parent)
+            if next_level == current_level {
+                let next_parent = app.tree_nodes[j]
+                    .section_index
+                    .and_then(|idx| app.sections[idx].parent_index);
+                if next_parent == current_parent {
+                    has_sibling_after = true;
+                    break;
+                }
             }
         }
 
-        is_last_at_level[i] = !found_next;
+        is_last_at_level[i] = !has_sibling_after;
     }
 
     // Track which parent levels still have siblings coming
@@ -109,11 +123,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                 parent_has_siblings[parent_idx] = !is_last_at_level[i];
             }
 
-            let tree_prefix = if app.file_mode == crate::app_state::FileMode::Multi {
-                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings)
-            } else {
-                String::new()
-            };
+            let tree_prefix = get_tree_prefix(node.tree_level, &parent_has_siblings);
 
             let line = match &node.node_type {
                 NodeType::Directory { name, .. } => {
@@ -132,7 +142,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {name}"),
+                            format!("  📄 {name}"),
                             Style::default()
                                 .fg(Color::Blue)
                                 .add_modifier(Modifier::BOLD),
@@ -141,12 +151,15 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
+                    // Calculate indentation based on section level
+                    let indent = "  ".repeat(section.level.saturating_sub(1));
+
                     let mut highlighted_line = format
                         .as_ref()
                         .format_section_display(section.level, &section.title);
 
-                    // Prepend tree prefix
-                    let mut spans = vec![Span::raw(tree_prefix)];
+                    // Prepend indent + tree prefix
+                    let mut spans = vec![Span::raw(indent), Span::raw(tree_prefix)];
                     spans.append(&mut highlighted_line.spans);
 
                     Line::from(spans)
@@ -260,7 +273,7 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
             }
 
             let tree_prefix = if app.file_mode == crate::app_state::FileMode::Multi {
-                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings)
+                get_tree_prefix(node.tree_level, &parent_has_siblings)
             } else {
                 String::new()
             };
@@ -282,7 +295,7 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     let spans = vec![
                         Span::raw(tree_prefix),
                         Span::styled(
-                            format!("📄 {name}"),
+                            format!("  📄 {name}"),
                             Style::default()
                                 .fg(Color::Blue)
                                 .add_modifier(Modifier::BOLD),
