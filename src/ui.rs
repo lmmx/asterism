@@ -109,11 +109,8 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                 parent_has_siblings[parent_idx] = !is_last_at_level[i];
             }
 
-            let tree_prefix = if app.file_mode == crate::app_state::FileMode::Multi {
-                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings)
-            } else {
-                String::new()
-            };
+            let tree_prefix =
+                get_tree_prefix(node.tree_level, is_last_at_level[i], &parent_has_siblings);
 
             let line = match &node.node_type {
                 NodeType::Directory { name, .. } => {
