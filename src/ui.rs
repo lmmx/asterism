@@ -100,7 +100,7 @@ fn draw_list(f: &mut Frame, app: &AppState) {
 
     f.render_widget(list, chunks[0]);
 
-    let help = Paragraph::new("↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | q: Quit/Back")
+    let help = Paragraph::new("↑/↓: Navigate | ←/→: Parent/Child | Enter: Edit | q: Quit")
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, chunks[1]);
 }
