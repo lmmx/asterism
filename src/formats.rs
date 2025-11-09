@@ -11,10 +11,14 @@ pub mod markdown;
 /// Enables support for markdown and other structured formats by providing format-specific parsing
 /// queries (tree-sitter uses SCM lisp queries).
 pub trait Format {
+    /// File extension for syntax highlighting (e.g., "md", "rs")
+    fn file_extension(&self) -> &'static str;
     /// Returns the tree-sitter language parser for this format.
     fn language(&self) -> tree_sitter::Language;
     /// Tree-sitter query matching section boundaries in this format.
     fn section_query(&self) -> &str;
     /// Tree-sitter query extracting section titles in this format.
     fn title_query(&self) -> &str;
+    /// Format a section heading for display with syntax highlighting
+    fn format_section_display(&self, level: usize, title: &str) -> ratatui::text::Line<'static>;
 }
