@@ -90,15 +90,15 @@ fn test_boundary_mode_exclude() {
 
     let content = fs::read_to_string(&path).unwrap();
 
-    println!("Result: {}", content);
+    println!("Result: {content}");
 
-    assert!(content.contains("A"));
+    assert!(content.contains('A'));
     assert!(content.contains("REPLACED"));
     assert!(
-        content.contains("C"),
+        content.contains('C'),
         "Line C should still exist (excluded)"
     );
-    assert!(content.contains("D"));
+    assert!(content.contains('D'));
 }
 
 #[test]
@@ -360,7 +360,7 @@ fn test_diagnose_line_numbers() {
     let content = fs::read_to_string(path).unwrap();
     println!("\n=== FILE CONTENT ===");
     for (i, line) in content.lines().enumerate() {
-        println!("Line {} (0-idx): {:?}", i, line);
+        println!("Line {i} (0-idx): {line:?}");
     }
     println!("Total lines: {}", content.lines().count());
 
@@ -385,7 +385,7 @@ fn test_diagnose_line_numbers() {
         if sec.byte_start < bytes.len() && sec.byte_end <= bytes.len() {
             let section_bytes = &bytes[sec.byte_start..sec.byte_end];
             let section_text = String::from_utf8_lossy(section_bytes);
-            println!("  byte content: {:?}", section_text);
+            println!("  byte content: {section_text:?}");
         }
     }
 
@@ -414,12 +414,12 @@ fn test_diagnose_line_numbers() {
             let result = fs::read_to_string(path).unwrap();
             println!("\n=== RESULT ===");
             for (i, line) in result.lines().enumerate() {
-                println!("Line {} (0-idx): {:?}", i, line);
+                println!("Line {i} (0-idx): {line:?}");
             }
         }
         Err(e) => {
             println!("\n=== ERROR ===");
-            println!("{:?}", e);
+            println!("{e:?}");
         }
     }
 }
@@ -434,7 +434,7 @@ fn test_textum_line_behavior() {
     println!("\n=== ORIGINAL ===");
     let orig = fs::read_to_string(&path).unwrap();
     for (i, line) in orig.lines().enumerate() {
-        println!("{}: {:?}", i, line);
+        println!("{i}: {line:?}");
     }
 
     // Test 1: Replace line 1 (0-indexed) with Include/Exclude
@@ -454,7 +454,7 @@ fn test_textum_line_behavior() {
     println!("\n=== AFTER EDIT (lines 1-2, line 2 excluded) ===");
     let result = fs::read_to_string(&path).unwrap();
     for (i, line) in result.lines().enumerate() {
-        println!("{}: {:?}", i, line);
+        println!("{i}: {line:?}");
     }
 
     // What we expect:
