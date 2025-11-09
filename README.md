@@ -51,15 +51,24 @@ asterism README.md
 
 asterism can display and navigate difftastic structural diffs:
 
+<img width="1624" height="1050" alt="Difftastic Asterism demo" src="https://github.com/user-attachments/assets/c62024a5-7047-4be7-bdfb-89935adfeac2" />
+
+- Viewing/editing of the diff chunks TODO! (WIP)
+
 ### From a JSON file:
 ```sh
-difft --display json file1.rs file2.rs > diff.json
+DFT_DISPLAY=json DFT_UNSTABLE=yes difft file1.rs file2.rs > diff.json
 asterism -d diff.json
 ```
 
 ### From stdin:
 ```sh
-difft --display json file1.rs file2.rs | asterism --stdin
+DFT_DISPLAY=json DFT_UNSTABLE=yes difft file1.rs file2.rs | asterism --stdin
+```
+
+### From git:
+```sh
+DFT_DISPLAY=json DFT_UNSTABLE=yes git -c diff.external=difft diff --cached | asterism -d --stdin
 ```
 
 ### As a git difftool:
