@@ -100,27 +100,45 @@ impl Format for DifftasticFormat {
 
 /// Parse difftastic JSON output into sections
 ///
+/// Handles both array format and newline-delimited JSON (NDJSON) format.
+///
 /// # Errors
 ///
 /// Returns an error if JSON parsing fails or if the format is invalid.
 pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
-    // Try parsing as array first (multi-file output)
     let files: Vec<DifftFile> = if let Ok(files) = serde_json::from_str::<Vec<DifftFile>>(json_str)
     {
+        // Array format: [{file1}, {file2}]
         files
+    } else if json_str.trim().starts_with('[') {
+        // Failed to parse as array, invalid format
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid JSON array format",
+        ));
     } else {
-        // Try parsing as single object (git diff output)
-        let file: DifftFile = serde_json::from_str(json_str)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        vec![file]
+        // Try parsing as newline-delimited JSON (NDJSON/JSON Lines)
+        // This is what git outputs when there are multiple files
+        json_str
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                serde_json::from_str::<DifftFile>(line).map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Failed to parse JSON line: {e}"),
+                    )
+                })
+            })
+            .collect::<Result<Vec<DifftFile>, io::Error>>()?
     };
 
     let mut sections = Vec::new();
     let mut global_line = 0i64;
 
     for file in &files {
-        // Skip files without chunks
-        if file.chunks.is_none() || file.status == "unchanged" {
+        // Skip only unchanged files (show created, deleted, and changed)
+        if file.status == "unchanged" {
             continue;
         }
 
@@ -177,6 +195,31 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
                     .push(new_section_idx);
                 global_line = hunk_end_line + 1;
             }
+        } else if file.status == "created" || file.status == "deleted" {
+            // For files with no chunks (created/deleted files without detailed hunks),
+            // create a placeholder hunk showing the status
+            let hunk_title = format!("File {} (no detailed diff available)", file.status);
+
+            sections.push(Section {
+                title: hunk_title,
+                level: 2,
+                line_start: global_line,
+                line_end: global_line + 1,
+                column_start: 0,
+                column_end: 0,
+                byte_start: 0,
+                byte_end: 0,
+                file_path: file.path.clone(),
+                parent_index: Some(file_section_idx),
+                children_indices: Vec::new(),
+                doc_comment: Some(vec![format!("File was {}", file.status)]),
+            });
+
+            let new_section_idx = sections.len() - 1;
+            sections[file_section_idx]
+                .children_indices
+                .push(new_section_idx);
+            global_line += 2;
         }
 
         sections[file_section_idx].line_end = global_line;
