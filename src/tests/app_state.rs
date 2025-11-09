@@ -190,7 +190,7 @@ fn test_multiple_edits_correct_offsets() {
         if let Some(section_idx) = n.section_index {
             app.sections
                 .get(section_idx)
-                .map_or(false, |s| s.title == "Three")
+                .is_some_and(|s| s.title == "Three")
         } else {
             false
         }
