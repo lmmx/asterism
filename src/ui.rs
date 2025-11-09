@@ -63,10 +63,10 @@ fn draw_list(f: &mut Frame, app: &AppState) {
     let is_difftastic = app.sections.iter().any(|s| s.chunk_type.is_some())
         || app.sections.iter().any(|s| s.title.contains("@@"));
 
-    let format: &dyn Format = if is_difftastic {
-        &crate::formats::difftastic::DifftasticFormat
+    let format: Box<dyn Format> = if is_difftastic {
+        Box::new(crate::formats::difftastic::DifftasticFormat)
     } else {
-        &crate::formats::markdown::MarkdownFormat
+        Box::new(crate::formats::markdown::MarkdownFormat)
     };
 
     // Calculate which nodes are last at their level for box-drawing
@@ -141,8 +141,9 @@ fn draw_list(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
+                    let mut highlighted_line = format
+                        .as_ref()
+                        .format_section_display(section.level, &section.title);
 
                     // Prepend tree prefix
                     let mut spans = vec![Span::raw(tree_prefix)];
@@ -217,10 +218,10 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
     let is_difftastic = app.sections.iter().any(|s| s.chunk_type.is_some())
         || app.sections.iter().any(|s| s.title.contains("@@"));
 
-    let format: &dyn Format = if is_difftastic {
-        &crate::formats::difftastic::DifftasticFormat
+    let format: Box<dyn Format> = if is_difftastic {
+        Box::new(crate::formats::difftastic::DifftasticFormat)
     } else {
-        &crate::formats::markdown::MarkdownFormat
+        Box::new(crate::formats::markdown::MarkdownFormat)
     };
 
     // Calculate which nodes are last at their level
@@ -290,8 +291,9 @@ fn draw_list_with_command(f: &mut Frame, app: &AppState) {
                     Line::from(spans)
                 }
                 NodeType::Section(section) => {
-                    let mut highlighted_line =
-                        format.format_section_display(section.level, &section.title);
+                    let mut highlighted_line = format
+                        .as_ref()
+                        .format_section_display(section.level, &section.title);
 
                     // Prepend tree prefix
                     let mut spans = vec![Span::raw(tree_prefix)];
