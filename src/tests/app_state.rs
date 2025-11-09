@@ -26,6 +26,9 @@ fn test_edit_persists_correctly() {
             parent_index: None,
             children_indices: vec![1],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "World".to_string(),
@@ -40,6 +43,9 @@ fn test_edit_persists_correctly() {
             parent_index: Some(0),
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
     ];
 
@@ -92,6 +98,9 @@ fn test_edit_plan_captures_changes() {
         parent_index: None,
         children_indices: vec![],
         doc_comment: None,
+        chunk_type: None,
+        lhs_content: None,
+        rhs_content: None,
     }];
 
     let mut app = AppState::new(vec![path.clone()], sections, 100);
@@ -140,6 +149,9 @@ fn test_multiple_edits_correct_offsets() {
             parent_index: None,
             children_indices: vec![1],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -154,6 +166,9 @@ fn test_multiple_edits_correct_offsets() {
             parent_index: Some(0),
             children_indices: vec![2],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Three".to_string(),
@@ -168,6 +183,9 @@ fn test_multiple_edits_correct_offsets() {
             parent_index: Some(1),
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
     ];
 
@@ -237,6 +255,9 @@ fn test_tree_structure_single_file() {
             parent_index: None,
             children_indices: vec![1],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -251,6 +272,9 @@ fn test_tree_structure_single_file() {
             parent_index: Some(0),
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
     ];
 
@@ -287,6 +311,9 @@ fn test_tree_structure_multi_file() {
             parent_index: None,
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -301,6 +328,9 @@ fn test_tree_structure_multi_file() {
             parent_index: None,
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
     ];
 
@@ -350,6 +380,9 @@ fn test_navigation_skips_files() {
             parent_index: None,
             children_indices: vec![1],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -364,6 +397,9 @@ fn test_navigation_skips_files() {
             parent_index: Some(0),
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
         Section {
             title: "Three".to_string(),
@@ -378,6 +414,9 @@ fn test_navigation_skips_files() {
             parent_index: None,
             children_indices: vec![],
             doc_comment: None,
+            chunk_type: None,
+            lhs_content: None,
+            rhs_content: None,
         },
     ];
 

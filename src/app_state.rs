@@ -6,9 +6,9 @@
 //! session so that we can determine the correct offset to insert content at without re-parsing.
 
 use crate::edit_plan::{Edit, EditPlan};
-use crate::section::ChunkType;
 use crate::formats::markdown::MarkdownFormat;
 use crate::input;
+use crate::section::ChunkType;
 use crate::section::{Section, TreeNode};
 use edtui::{EditorState, Lines};
 use std::collections::HashMap;
@@ -89,10 +89,7 @@ impl AppState {
         let tree_nodes = Self::build_tree(&files, &sections);
 
         // Find first navigable node
-        let initial_index = tree_nodes
-            .iter()
-            .position(|n| n.navigable)
-            .unwrap_or(0);
+        let initial_index = tree_nodes.iter().position(|n| n.navigable).unwrap_or(0);
 
         Self {
             sections,
@@ -120,11 +117,7 @@ impl AppState {
         if files.len() == 1 && !has_chunks {
             // Single markdown file mode: just show sections with their heading hierarchy
             for (idx, section) in sections.iter().enumerate() {
-                nodes.push(TreeNode::section(
-                    section.clone(),
-                    section.level - 1,
-                    idx,
-                ));
+                nodes.push(TreeNode::section(section.clone(), section.level - 1, idx));
             }
         } else {
             // Multi-file mode OR difftastic mode: build directory tree with sections nested under files
@@ -155,11 +148,7 @@ impl AppState {
                 // Add sections under this file
                 if let Some(file_sections) = file_tree.get(&path_str) {
                     for (idx, section) in file_sections {
-                        let tree_level = if has_chunks {
-                            1
-                        } else {
-                            section.level
-                        };
+                        let tree_level = if has_chunks { 1 } else { section.level };
                         nodes.push(TreeNode::section((*section).clone(), tree_level, *idx));
                     }
                 }
@@ -315,13 +304,25 @@ impl AppState {
                 }
                 ChunkType::Modified => {
                     // Show a unified or side-by-side view
-                    let lhs = section.lhs_content.as_ref().map(|s| s.as_str()).unwrap_or("");
-                    let rhs = section.rhs_content.as_ref().map(|s| s.as_str()).unwrap_or("");
+                    let lhs = section
+                        .lhs_content
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    let rhs = section
+                        .rhs_content
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
                     format!("- {}\n+ {}", lhs, rhs)
                 }
                 ChunkType::Unchanged => {
                     // Show either side (they're the same)
-                    section.lhs_content.clone().or_else(|| section.rhs_content.clone()).unwrap_or_default()
+                    section
+                        .lhs_content
+                        .clone()
+                        .or_else(|| section.rhs_content.clone())
+                        .unwrap_or_default()
                 }
             };
 

@@ -41,11 +41,16 @@ pub struct Section {
 }
 
 #[derive(Clone)]
+/// What sort of hunk (syntactic diff atomic unit) it is.
 pub enum ChunkType {
-    Added,      // Only rhs exists
-    Deleted,    // Only lhs exists
-    Modified,   // Both exist and differ
-    Unchanged,  // Both exist and are the same
+    /// Only RHS exists
+    Added,
+    /// Only LHS exists
+    Deleted,
+    /// Both LHS and RHS exist (and differ)
+    Modified,
+    /// Both LHS and RHS exist (and are the same, at least syntactically)
+    Unchanged,
 }
 
 #[derive(Clone)]
