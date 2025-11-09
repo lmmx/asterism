@@ -85,21 +85,6 @@ impl Format for DifftasticFormat {
     }
 
     fn format_section_display(&self, level: usize, title: &str) -> Line<'static> {
-        // Check if this is a file creation/deletion message
-        if title.contains("File created") {
-            let spans = vec![Span::styled(
-                title.to_string(),
-                Style::default().fg(Color::Green),
-            )];
-            return Line::from(spans);
-        } else if title.contains("File deleted") || title.contains("File was deleted") {
-            let spans = vec![Span::styled(
-                title.to_string(),
-                Style::default().fg(Color::Red),
-            )];
-            return Line::from(spans);
-        }
-
         // Check if this is a hunk header with format: (N) @@ -X,Y +A,B @@
         if title.contains("@@") && title.starts_with('(') {
             if let Some(close_paren) = title.find(')') {
@@ -156,10 +141,21 @@ impl DifftasticFormat {
                     .and_then(|s| s.parse::<u32>().ok())
                     .unwrap_or(1);
 
-                if lhs_count == 0 && rhs_count > 0 {
+                // Parse the line numbers too to detect -0,0 +1,N
+                let lhs_start = lhs
+                    .split(',')
+                    .next()
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(0);
+
+                if lhs_start == 0 && lhs_count == 0 && rhs_count > 0 {
                     return Color::Green; // Addition
-                } else if lhs_count > 0 && rhs_count == 0 {
+                } else if lhs_count > 0 && rhs_count == 0 && rhs.starts_with("0,") {
                     return Color::Red; // Deletion
+                } else if lhs_count == 0 && rhs_count > 0 {
+                    return Color::Green; // Pure addition
+                } else if lhs_count > 0 && rhs_count == 0 {
+                    return Color::Red; // Pure deletion
                 }
             }
         }
@@ -281,15 +277,38 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
             }
         } else if file.status == "created" || file.status == "deleted" {
             // For files with no chunks (created/deleted without detailed hunks),
-            // create a single hunk showing the status
-            let hunk_title = format!("(1) File {}", file.status);
-            let hunk_content = format!("File was {}", file.status);
+            // create a proper hunk header
+
+            // Try to read the file to get line count
+            let line_count = if file.status == "created" {
+                // For created files, try to read from filesystem
+                std::fs::read_to_string(file_path)
+                    .ok()
+                    .map(|content| content.lines().count())
+                    .unwrap_or(0)
+            } else {
+                0 // Deleted files
+            };
+
+            let hunk_title = if file.status == "created" {
+                format!("(1) @@ -0,0 +1,{} @@", line_count)
+            } else {
+                format!("(1) @@ -1,{} +0,0 @@", line_count)
+            };
+
+            let hunk_content = if file.status == "created" {
+                std::fs::read_to_string(file_path)
+                    .ok()
+                    .unwrap_or_else(|| format!("File was {}", file.status))
+            } else {
+                format!("File was {}", file.status)
+            };
 
             sections.push(Section {
                 title: hunk_title,
                 level: 1,
                 line_start: global_line,
-                line_end: global_line + 1,
+                line_end: global_line + i64::try_from(line_count).unwrap_or(0),
                 column_start: 0,
                 column_end: 0,
                 byte_start: 0,
@@ -297,13 +316,13 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
                 file_path: file_path.clone(),
                 parent_index: None,
                 children_indices: Vec::new(),
-                doc_comment: Some(vec![hunk_content]),
+                doc_comment: Some(hunk_content.lines().map(String::from).collect()),
                 chunk_type: None,
                 lhs_content: None,
                 rhs_content: None,
             });
 
-            global_line += 2;
+            global_line += i64::try_from(line_count).unwrap_or(0) + 1;
         }
     }
 
