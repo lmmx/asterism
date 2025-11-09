@@ -10,6 +10,7 @@ use ratatui::{
     text::{Line, Span},
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 use std::io;
 
 /// Represents a file in difftastic output
@@ -20,7 +21,8 @@ pub struct DifftFile {
     /// File path relative to the comparison root.
     pub path: String,
     /// Grouped diff hunks, each containing lines that changed together.
-    pub chunks: Vec<Vec<DifftLine>>,
+    #[serde(default)]
+    pub chunks: Option<Vec<Vec<DifftLine>>>,
     /// Change classification: "unchanged", "changed", "created", or "deleted".
     pub status: String,
 }
@@ -108,9 +110,9 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
     let mut sections = Vec::new();
     let mut global_line = 0i64;
 
-    for file in files.iter() {
+    for file in &files {
         // Skip unchanged files
-        if file.status == "unchanged" {
+        if file.chunks.is_none() || file.status == "unchanged" {
             continue;
         }
 
@@ -137,33 +139,36 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
         global_line += 1;
 
         // Create hunk sections
-        for (hunk_idx, chunk) in file.chunks.iter().enumerate() {
-            let hunk_title = format_hunk_title(chunk, hunk_idx);
-            let hunk_content = format_hunk_content(chunk);
+        if let Some(chunks) = &file.chunks {
+            for (hunk_idx, chunk) in chunks.iter().enumerate() {
+                let hunk_title = format_hunk_title(chunk, hunk_idx);
+                let hunk_content = format_hunk_content(chunk);
 
-            let hunk_start_line = global_line;
-            let hunk_end_line = global_line + hunk_content.lines().count() as i64;
+                let hunk_start_line = global_line;
+                let hunk_end_line =
+                    global_line + i64::try_from(hunk_content.lines().count()).unwrap_or(0);
 
-            sections.push(Section {
-                title: hunk_title,
-                level: 2,
-                line_start: hunk_start_line,
-                line_end: hunk_end_line,
-                column_start: 0,
-                column_end: 0,
-                byte_start: 0,
-                byte_end: 0,
-                file_path: file.path.clone(),
-                parent_index: Some(file_section_idx),
-                children_indices: Vec::new(),
-                doc_comment: Some(vec![hunk_content]),
-            });
+                sections.push(Section {
+                    title: hunk_title,
+                    level: 2,
+                    line_start: hunk_start_line,
+                    line_end: hunk_end_line,
+                    column_start: 0,
+                    column_end: 0,
+                    byte_start: 0,
+                    byte_end: 0,
+                    file_path: file.path.clone(),
+                    parent_index: Some(file_section_idx),
+                    children_indices: Vec::new(),
+                    doc_comment: Some(vec![hunk_content]),
+                });
 
-            let new_section_idx = sections.len() - 1;
-            sections[file_section_idx]
-                .children_indices
-                .push(new_section_idx);
-            global_line = hunk_end_line + 1;
+                let new_section_idx = sections.len() - 1;
+                sections[file_section_idx]
+                    .children_indices
+                    .push(new_section_idx);
+                global_line = hunk_end_line + 1;
+            }
         }
 
         sections[file_section_idx].line_end = global_line;
@@ -230,13 +235,13 @@ fn format_hunk_content(chunk: &[DifftLine]) -> String {
         match (&line.lhs, &line.rhs) {
             (Some(lhs), Some(rhs)) => {
                 // Modified line - show both sides
-                output.push_str(&format!("-{}: ", lhs.line_number));
+                write!(output, "-{}: ", lhs.line_number).unwrap();
                 for change in &lhs.changes {
                     output.push_str(&change.content);
                 }
                 output.push('\n');
 
-                output.push_str(&format!("+{}: ", rhs.line_number));
+                write!(output, "+{}: ", rhs.line_number).unwrap();
                 for change in &rhs.changes {
                     output.push_str(&change.content);
                 }
@@ -244,7 +249,7 @@ fn format_hunk_content(chunk: &[DifftLine]) -> String {
             }
             (Some(lhs), None) => {
                 // Deleted line
-                output.push_str(&format!("-{}: ", lhs.line_number));
+                write!(output, "-{}: ", lhs.line_number).unwrap();
                 for change in &lhs.changes {
                     output.push_str(&change.content);
                 }
@@ -252,7 +257,7 @@ fn format_hunk_content(chunk: &[DifftLine]) -> String {
             }
             (None, Some(rhs)) => {
                 // Added line
-                output.push_str(&format!("+{}: ", rhs.line_number));
+                write!(output, "+{}: ", rhs.line_number).unwrap();
                 for change in &rhs.changes {
                     output.push_str(&change.content);
                 }

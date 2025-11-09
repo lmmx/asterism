@@ -11,8 +11,8 @@ use ratatui::crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
-use std::path::PathBuf;
 use std::io::Read;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "asterism")]
