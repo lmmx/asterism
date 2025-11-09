@@ -14,6 +14,10 @@ and [edtui][edtui] to emulate a vim editor in which to edit section content.
 
 [edtui]: https://github.com/preiter93/edtui
 
+<img width="1769" height="907" alt="You are here" src="https://github.com/user-attachments/assets/35b0e7b5-66dd-410b-9625-98ae858bebe3" />
+
+> You are here
+
 ## Features
 
 - Tree-sitter based markdown parsing
