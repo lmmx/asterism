@@ -664,6 +664,17 @@ impl AppState {
     }
 
     /// Apply section reordering to disk
+    ///
+    /// Rewrites files with sections in their new order and with updated heading levels.
+    /// After successful write, reloads all sections from disk to ensure accurate byte
+    /// positions and line numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - File read operations fail
+    /// - File write operations fail  
+    /// - Section extraction/parsing fails after rewrite
     pub fn save_section_reorder(&mut self) -> io::Result<()> {
         if self.move_state != MoveState::Moved {
             return Ok(());
@@ -680,7 +691,7 @@ impl AppState {
 
         // Process each file
         for (file_path, sections) in file_sections {
-            self.rewrite_file_sections(&file_path, sections)?;
+            Self::rewrite_file_sections(&file_path, &sections)?;
         }
 
         // Reload sections to get updated positions
@@ -700,13 +711,11 @@ impl AppState {
     }
 
     /// Rewrite an entire file with reordered sections
-    fn rewrite_file_sections(&self, file_path: &str, sections: Vec<&Section>) -> io::Result<()> {
+    fn rewrite_file_sections(file_path: &str, sections: &[&Section]) -> io::Result<()> {
         let content = fs::read_to_string(file_path)?;
         let mut new_content = String::new();
 
-        // Extract section content for each section
-        let mut section_contents: Vec<(usize, String, String)> = Vec::new();
-        for section in &sections {
+        for section in sections {
             let heading_prefix = "#".repeat(section.level);
             let heading = format!("{} {}", heading_prefix, section.title);
 
@@ -721,15 +730,10 @@ impl AppState {
                     String::new()
                 };
 
-            section_contents.push((section.level, heading, section_text));
-        }
-
-        // Write sections in new order
-        for (i, (level, heading, content)) in section_contents.iter().enumerate() {
-            new_content.push_str(heading);
+            new_content.push_str(&heading);
             new_content.push_str("\n\n");
-            if !content.is_empty() {
-                new_content.push_str(content);
+            if !section_text.is_empty() {
+                new_content.push_str(&section_text);
                 new_content.push_str("\n\n");
             }
         }
