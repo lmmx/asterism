@@ -14,7 +14,7 @@ and [edtui][edtui] to emulate a vim editor in which to edit section content.
 
 [edtui]: https://github.com/preiter93/edtui
 
-<img width="1769" height="907" alt="You are here" src="https://github.com/user-attachments/assets/35b0e7b5-66dd-410b-9625-98ae858bebe3" />
+![You are here](https://github.com/user-attachments/assets/35b0e7b5-66dd-410b-9625-98ae858bebe3)
 
 > You are here
 
@@ -51,7 +51,7 @@ asterism README.md
 
 asterism can display and navigate difftastic structural diffs:
 
-<img width="1624" height="1050" alt="Difftastic Asterism demo" src="https://github.com/user-attachments/assets/c62024a5-7047-4be7-bdfb-89935adfeac2" />
+![Difftastic Asterism demo](https://github.com/user-attachments/assets/c62024a5-7047-4be7-bdfb-89935adfeac2)
 
 - Viewing/editing of the diff chunks TODO! (WIP)
 
