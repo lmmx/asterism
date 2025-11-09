@@ -162,7 +162,7 @@ impl AppState {
                 };
 
                 nodes.push(TreeNode::file(
-                    format!("{} ({})", file_name, status),
+                    format!("{file_name} ({status})"),
                     file_path.clone(),
                     0,
                 ));
@@ -358,17 +358,9 @@ impl AppState {
                 }
                 ChunkType::Modified => {
                     // Show a unified or side-by-side view
-                    let lhs = section
-                        .lhs_content
-                        .as_ref()
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
-                    let rhs = section
-                        .rhs_content
-                        .as_ref()
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
-                    format!("- {}\n+ {}", lhs, rhs)
+                    let lhs = section.lhs_content.as_deref().unwrap_or("");
+                    let rhs = section.rhs_content.as_deref().unwrap_or("");
+                    format!("- {lhs}\n+ {rhs}")
                 }
                 ChunkType::Unchanged => {
                     // Show either side (they're the same)
@@ -382,23 +374,21 @@ impl AppState {
 
             let lines = Lines::from(content.as_str());
             self.editor_state = Some(EditorState::new(lines));
-        } else {
-            if let Ok(content) = fs::read_to_string(&section.file_path) {
-                let bytes = content.as_bytes();
-                let section_bytes =
-                    &bytes[section.byte_start.min(bytes.len())..section.byte_end.min(bytes.len())];
+        } else if let Ok(content) = fs::read_to_string(&section.file_path) {
+            let bytes = content.as_bytes();
+            let section_bytes =
+                &bytes[section.byte_start.min(bytes.len())..section.byte_end.min(bytes.len())];
 
-                let section_content = String::from_utf8_lossy(section_bytes).to_string();
+            let section_content = String::from_utf8_lossy(section_bytes).to_string();
 
-                let lines_text = if section_content.trim().is_empty() {
-                    "\n".to_string()
-                } else {
-                    format!("\n{}\n", section_content.trim())
-                };
+            let lines_text = if section_content.trim().is_empty() {
+                "\n".to_string()
+            } else {
+                format!("\n{}\n", section_content.trim())
+            };
 
-                let lines = Lines::from(lines_text.as_str());
-                self.editor_state = Some(EditorState::new(lines));
-            }
+            let lines = Lines::from(lines_text.as_str());
+            self.editor_state = Some(EditorState::new(lines));
         }
 
         self.current_view = View::Detail;

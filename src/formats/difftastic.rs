@@ -176,34 +176,41 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
 
         // Create hunk sections directly (no file section)
         if let Some(chunks) = &file.chunks {
-            for (hunk_idx, chunk) in chunks.iter().enumerate() {
-                let hunk_title = format_hunk_title(chunk, hunk_idx);
-                let hunk_content = format_hunk_content(chunk);
+            let mut hunk_counter = 0;
+            for chunk in chunks {
+                // Each element in the chunk array is a separate hunk
+                for change in chunk {
+                    hunk_counter += 1;
 
-                let hunk_start_line = global_line;
-                let hunk_end_line =
-                    global_line + i64::try_from(hunk_content.lines().count()).unwrap_or(0);
+                    // Format this individual change as a hunk
+                    let hunk_title = format_change_title(change, hunk_counter);
+                    let hunk_content = format_change_content(change);
 
-                // Create section for this hunk
-                sections.push(Section {
-                    title: hunk_title,
-                    level: 1, // All hunks are top-level sections
-                    line_start: hunk_start_line,
-                    line_end: hunk_end_line,
-                    column_start: 0,
-                    column_end: 0,
-                    byte_start: 0,
-                    byte_end: 0,
-                    file_path: file_path.clone(),
-                    parent_index: None,
-                    children_indices: Vec::new(),
-                    doc_comment: Some(vec![hunk_content]),
-                    chunk_type: None,
-                    lhs_content: None,
-                    rhs_content: None,
-                });
+                    let hunk_start_line = global_line;
+                    let hunk_end_line =
+                        global_line + i64::try_from(hunk_content.lines().count()).unwrap_or(0);
 
-                global_line = hunk_end_line + 1;
+                    // Create section for this hunk
+                    sections.push(Section {
+                        title: hunk_title,
+                        level: 1,
+                        line_start: hunk_start_line,
+                        line_end: hunk_end_line,
+                        column_start: 0,
+                        column_end: 0,
+                        byte_start: 0,
+                        byte_end: 0,
+                        file_path: file_path.clone(),
+                        parent_index: None,
+                        children_indices: Vec::new(),
+                        doc_comment: Some(vec![hunk_content]),
+                        chunk_type: None,
+                        lhs_content: None,
+                        rhs_content: None,
+                    });
+
+                    global_line = hunk_end_line + 1;
+                }
             }
         } else if file.status == "created" || file.status == "deleted" {
             // For files with no chunks (created/deleted without detailed hunks),
@@ -236,96 +243,65 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
     Ok(sections)
 }
 
-/// Format a hunk title showing line number range
-fn format_hunk_title(chunk: &[DifftLine], hunk_idx: usize) -> String {
-    let mut lhs_lines = Vec::new();
-    let mut rhs_lines = Vec::new();
-
-    for line in chunk {
-        if let Some(ref lhs) = line.lhs {
-            lhs_lines.push(lhs.line_number);
+/// Format a single change as a hunk title
+fn format_change_title(change: &DifftLine, change_num: usize) -> String {
+    match (&change.lhs, &change.rhs) {
+        (Some(lhs), Some(rhs)) if lhs.line_number == rhs.line_number => {
+            format!("Change {} (line {})", change_num, lhs.line_number)
         }
-        if let Some(ref rhs) = line.rhs {
-            rhs_lines.push(rhs.line_number);
-        }
-    }
-
-    match (
-        lhs_lines.first(),
-        lhs_lines.last(),
-        rhs_lines.first(),
-        rhs_lines.last(),
-    ) {
-        (Some(lhs_start), Some(lhs_end), Some(rhs_start), Some(rhs_end)) => {
+        (Some(lhs), Some(rhs)) => {
             format!(
-                "Hunk {} (@@ -{},{} +{},{} @@)",
-                hunk_idx + 1,
-                lhs_start,
-                lhs_end - lhs_start + 1,
-                rhs_start,
-                rhs_end - rhs_start + 1
+                "Change {} (lines {}-{})",
+                change_num, lhs.line_number, rhs.line_number
             )
         }
-        (Some(lhs_start), Some(lhs_end), None, None) => {
-            format!(
-                "Hunk {} (deletion @@ -{},{} @@)",
-                hunk_idx + 1,
-                lhs_start,
-                lhs_end - lhs_start + 1
-            )
+        (Some(lhs), None) => {
+            format!("Deletion {} (line {})", change_num, lhs.line_number)
         }
-        (None, None, Some(rhs_start), Some(rhs_end)) => {
-            format!(
-                "Hunk {} (addition @@ +{},{} @@)",
-                hunk_idx + 1,
-                rhs_start,
-                rhs_end - rhs_start + 1
-            )
+        (None, Some(rhs)) => {
+            format!("Addition {} (line {})", change_num, rhs.line_number)
         }
-        _ => format!("Hunk {}", hunk_idx + 1),
+        _ => format!("Change {change_num}"),
     }
 }
 
-/// Format hunk content for display
-fn format_hunk_content(chunk: &[DifftLine]) -> String {
+/// Format a single change for display
+fn format_change_content(change: &DifftLine) -> String {
     let mut output = String::new();
 
-    for line in chunk {
-        match (&line.lhs, &line.rhs) {
-            (Some(lhs), Some(rhs)) => {
-                // Modified line - show both sides
-                write!(output, "-{}: ", lhs.line_number).unwrap();
-                for change in &lhs.changes {
-                    output.push_str(&change.content);
-                }
-                output.push('\n');
+    match (&change.lhs, &change.rhs) {
+        (Some(lhs), Some(rhs)) => {
+            // Modified line - show both sides
+            write!(output, "-{}: ", lhs.line_number).unwrap();
+            for ch in &lhs.changes {
+                output.push_str(&ch.content);
+            }
+            output.push('\n');
 
-                write!(output, "+{}: ", rhs.line_number).unwrap();
-                for change in &rhs.changes {
-                    output.push_str(&change.content);
-                }
-                output.push('\n');
+            write!(output, "+{}: ", rhs.line_number).unwrap();
+            for ch in &rhs.changes {
+                output.push_str(&ch.content);
             }
-            (Some(lhs), None) => {
-                // Deleted line
-                write!(output, "-{}: ", lhs.line_number).unwrap();
-                for change in &lhs.changes {
-                    output.push_str(&change.content);
-                }
-                output.push('\n');
+            output.push('\n');
+        }
+        (Some(lhs), None) => {
+            // Deleted line
+            write!(output, "-{}: ", lhs.line_number).unwrap();
+            for ch in &lhs.changes {
+                output.push_str(&ch.content);
             }
-            (None, Some(rhs)) => {
-                // Added line
-                write!(output, "+{}: ", rhs.line_number).unwrap();
-                for change in &rhs.changes {
-                    output.push_str(&change.content);
-                }
-                output.push('\n');
+            output.push('\n');
+        }
+        (None, Some(rhs)) => {
+            // Added line
+            write!(output, "+{}: ", rhs.line_number).unwrap();
+            for ch in &rhs.changes {
+                output.push_str(&ch.content);
             }
-            (None, None) => {
-                // Context line (shouldn't happen in difftastic output)
-                output.push_str(" \n");
-            }
+            output.push('\n');
+        }
+        (None, None) => {
+            output.push_str(" \n");
         }
     }
 
@@ -349,13 +325,13 @@ fn extract_column_range(side: &Value) -> (i64, i64) {
     let start = changes
         .and_then(|arr| arr.first())
         .and_then(|first| first.get("start"))
-        .and_then(|s| s.as_i64())
+        .and_then(serde_json::Value::as_i64)
         .unwrap_or(0);
 
     let end = changes
         .and_then(|arr| arr.last())
         .and_then(|last| last.get("end"))
-        .and_then(|e| e.as_i64())
+        .and_then(serde_json::Value::as_i64)
         .unwrap_or(0);
 
     (start, end)
@@ -395,13 +371,13 @@ pub fn extract_difftastic_sections(json_path: &Path) -> io::Result<Vec<Section>>
                         let line_num = lhs
                             .or(rhs)
                             .and_then(|v| v.get("line_number"))
-                            .and_then(|n| n.as_i64())
+                            .and_then(serde_json::Value::as_i64)
                             .unwrap_or(0);
 
                         let (column_start, column_end) =
-                            lhs.or(rhs).map(extract_column_range).unwrap_or((0, 0));
+                            lhs.or(rhs).map_or((0, 0), extract_column_range);
 
-                        let title = format!("Chunk @@ {}:{} @@", file_path, line_num);
+                        let title = format!("Chunk @@ {file_path}:{line_num} @@");
                         let lhs_text = lhs.and_then(extract_chunk_text);
                         let rhs_text = rhs.and_then(extract_chunk_text);
 
