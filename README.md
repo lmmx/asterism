@@ -52,7 +52,7 @@ asterism README.md
 
 asterism can display and navigate difftastic structural diffs:
 
-![Difftastic Asterism demo](https://github.com/user-attachments/assets/c62024a5-7047-4be7-bdfb-89935adfeac2)
+![Difftastic Asterism demo](https://github.com/user-attachments/assets/c29b3271-4a55-42dd-bcf3-97fb8aaad89f)
 
 - Viewing/editing of the diff chunks TODO! (WIP)
 
