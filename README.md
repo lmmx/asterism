@@ -22,6 +22,7 @@ and [edtui][edtui] to emulate a vim editor in which to edit section content.
 
 - Tree-sitter based markdown parsing
 - Hierarchical section navigation with parent/child relationships
+- Section reordering from the header outline
 - Visual line wrapping with configurable width
 - Multi-file support with directory tree display
 - Edit sections without modifying heading markup
@@ -30,7 +31,6 @@ and [edtui][edtui] to emulate a vim editor in which to edit section content.
 ## Installation
 
 Regular cargo install or (recommended) install the pre-built binary with:
-
 ```sh
 cargo binstall asterism
 ```
@@ -38,13 +38,11 @@ cargo binstall asterism
 ## Usage
 
 Edit markdown files in the current directory:
-
 ```sh
 asterism
 ```
 
 Edit a specific file:
-
 ```sh
 asterism README.md
 ```
@@ -60,6 +58,16 @@ asterism README.md
   - <kbd>Shift</kbd> + <kbd>Home</kbd>/<kbd>End</kbd>: Jump to first/last section at same level
 - <kbd>Enter</kbd>: Edit section
 - <kbd>q</kbd>: Quit (or return to file list in multi-file mode)
+
+#### Section Reordering
+
+- <kbd>Ctrl</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd>: Activate move mode (section turns orange), then move section up/down
+- <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd>: Change heading level (indent/dedent)
+- <kbd>Ctrl</kbd> + <kbd>Home</kbd>/<kbd>End</kbd>: Move section to top/bottom of document
+- <kbd>:w</kbd>: Save reordered structure to disk
+- <kbd>Esc</kbd>: Cancel move operation
+
+When moving, the selected section displays in orange, then turns red after being repositioned to indicate unsaved changes.
 
 ### Editor View
 
@@ -82,4 +90,3 @@ file_extensions = ["md", "markdown"]
 ## Licensing
 
 Asterism is [MIT licensed](https://github.com/lmmx/asterism/blob/master/LICENSE), a permissive open source license.
-
