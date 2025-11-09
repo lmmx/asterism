@@ -4,7 +4,7 @@
 //! The file list shows a directory tree for multi-file projects, the list view shows sections
 //! with their hierarchy, and the detail view provides a vim-like editor for section content.
 
-use crate::app_state::{AppState, FileMode, MoveState, View};
+use crate::app_state::{AppState, MoveState, View};
 use crate::config::Config;
 use crate::formats::Format;
 use edtui::{EditorTheme, EditorView, SyntaxHighlighter};
@@ -21,14 +21,13 @@ use ratatui::{
 /// Dispatches to file list, section tree, or editor view according to navigation context.
 pub fn draw(f: &mut Frame, app: &mut AppState, _cfg: &Config) {
     match (&app.file_mode, &app.current_view) {
-        (FileMode::Multi, View::FileList) => draw_file_list(f, app),
+        (_, View::FileList) => draw_file_list(f, app),
         (_, View::List) => draw_list(f, app),
         (_, View::Command) => {
             // Draw list view but with command prompt
             draw_list_with_command(f, app);
         }
         (_, View::Detail) => draw_detail(f, app),
-        (_, View::FileList) => draw_file_list(f, app),
     }
 }
 
