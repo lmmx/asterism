@@ -97,7 +97,7 @@ impl Format for DifftasticFormat {
                 let spans = vec![
                     Span::styled(hunk_num.to_string(), Style::default().fg(color)),
                     Span::raw(" "),
-                    Span::raw(rest.to_string()),
+                    Span::raw((*rest).to_string()),
                 ];
 
                 return Line::from(spans);
@@ -125,7 +125,7 @@ impl DifftasticFormat {
     fn determine_hunk_color_from_header(header: &str) -> Color {
         // Parse @@ -X,Y +A,B @@
         if let Some(hunk_part) = header.strip_prefix("@@").and_then(|s| s.split("@@").next()) {
-            let parts: Vec<&str> = hunk_part.trim().split_whitespace().collect();
+            let parts: Vec<&str> = hunk_part.split_whitespace().collect();
             if parts.len() >= 2 {
                 let lhs = parts[0].trim_start_matches('-');
                 let rhs = parts[1].trim_start_matches('+');
@@ -163,6 +163,7 @@ impl DifftasticFormat {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_chunk_section(
     file_path: &str,
     title: String,
@@ -284,16 +285,15 @@ pub fn parse_difftastic_json(json_str: &str) -> io::Result<Vec<Section>> {
                 // For created files, try to read from filesystem
                 std::fs::read_to_string(file_path)
                     .ok()
-                    .map(|content| content.lines().count())
-                    .unwrap_or(0)
+                    .map_or(0, |content| content.lines().count())
             } else {
                 0 // Deleted files
             };
 
             let hunk_title = if file.status == "created" {
-                format!("(1) @@ -0,0 +1,{} @@", line_count)
+                format!("(1) @@ -0,0 +1,{line_count} @@")
             } else {
-                format!("(1) @@ -1,{} +0,0 @@", line_count)
+                format!("(1) @@ -1,{line_count} +0,0 @@")
             };
 
             let hunk_content = if file.status == "created" {
@@ -418,6 +418,10 @@ fn extract_column_range(side: &Value) -> (i64, i64) {
 }
 
 /// Extract the difftastic hunks as sections (same as sections in a markdown etc)
+///
+/// # Errors
+///
+/// Returns an error if the JSON file cannot be read from disk.
 pub fn extract_difftastic_sections(json_path: &Path) -> io::Result<Vec<Section>> {
     let content = fs::read_to_string(json_path)?;
     let lines: Vec<Value> = content

@@ -63,7 +63,7 @@ fn test_parse_ndjson_multi_file() {
 
 #[test]
 fn test_hunk_structure() {
-    let json = r##"[{"chunks":[[{"lhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"a","highlight":"normal"}]},"rhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"b","highlight":"normal"}]}}],[{"lhs":{"line_number":5,"changes":[{"start":0,"end":1,"content":"c","highlight":"normal"}]},"rhs":{"line_number":5,"changes":[{"start":0,"end":1,"content":"d","highlight":"normal"}]}}]],"language":"Text","path":"multi.md","status":"changed"}]"##;
+    let json = r#"[{"chunks":[[{"lhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"a","highlight":"normal"}]},"rhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"b","highlight":"normal"}]}}],[{"lhs":{"line_number":5,"changes":[{"start":0,"end":1,"content":"c","highlight":"normal"}]},"rhs":{"line_number":5,"changes":[{"start":0,"end":1,"content":"d","highlight":"normal"}]}}]],"language":"Text","path":"multi.md","status":"changed"}]"#;
 
     let sections = parse_difftastic_json(json).unwrap();
 
@@ -113,7 +113,7 @@ fn test_deleted_file_no_chunks() {
 
 #[test]
 fn test_file_path_tracking() {
-    let json = r##"{"chunks":[[{"lhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"a","highlight":"normal"}]},"rhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"b","highlight":"normal"}]}}]],"language":"Rust","path":"src/main.rs","status":"changed"}"##;
+    let json = r#"{"chunks":[[{"lhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"a","highlight":"normal"}]},"rhs":{"line_number":0,"changes":[{"start":0,"end":1,"content":"b","highlight":"normal"}]}}]],"language":"Rust","path":"src/main.rs","status":"changed"}"#;
 
     let sections = parse_difftastic_json(json).unwrap();
 
