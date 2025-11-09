@@ -4,6 +4,7 @@
 //! document formats (markdown, org-mode, restructuredtext, etc.) by providing
 //! tree-sitter queries specific to each format.
 
+pub mod difftastic;
 pub mod markdown;
 
 /// Abstracts document type differences through tree-sitter queries.
