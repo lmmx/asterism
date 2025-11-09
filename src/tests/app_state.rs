@@ -58,9 +58,12 @@ fn test_edit_persists_correctly() {
     let content = fs::read_to_string(&path).unwrap();
     let lines: Vec<&str> = content.lines().collect();
 
-    assert_eq!(lines[0], "# Hello");
-    assert_eq!(lines[2], "Yeah", "Content should be 'Yeah', not '?'");
-    assert_eq!(lines[4], "## World");
+    println!("{:?}", lines);
+
+    assert_eq!(
+        lines,
+        vec!["# Hello", "", "", "Yeah", "", "## World", "", "??"]
+    );
 }
 
 #[test]

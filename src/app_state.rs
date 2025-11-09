@@ -292,16 +292,30 @@ impl AppState {
         if let Ok(new_sections) =
             input::extract_sections(&PathBuf::from(&section.file_path), &format)
         {
-            // Find matching section by title and level
-            if let Some(new_index) = new_sections
+            // Find matching section by title and level BEFORE modifying sections
+            let target_title = section.title.clone();
+            let target_level = section.level;
+
+            // Remove old sections from this file
+            let file_path = section.file_path.clone();
+            self.sections.retain(|s| s.file_path != file_path);
+
+            // Find the index in new_sections
+            if let Some(local_index) = new_sections
                 .iter()
-                .position(|s| s.title == section.title && s.level == section.level)
+                .position(|s| s.title == target_title && s.level == target_level)
             {
-                // Update sections from this file
-                let file_path = section.file_path.clone();
-                self.sections.retain(|s| s.file_path != file_path);
+                // Calculate what the new global index will be after extending
+                let new_global_index = self.sections.len() + local_index;
+
+                // Now extend with new sections
                 self.sections.extend(new_sections);
-                self.current_section_index = new_index;
+
+                // Set to the correct global index
+                self.current_section_index = new_global_index;
+            } else {
+                // If we can't find it, just extend and stay at current position
+                self.sections.extend(new_sections);
             }
         }
 
