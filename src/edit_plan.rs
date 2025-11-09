@@ -29,7 +29,7 @@ pub struct Edit {
     /// Ending column of the section header.
     pub column_end: i64,
     /// New content replacing the section body.
-    pub doc_comment: String,
+    pub section_content: String,
     /// Section title for tracking and debugging edits.
     pub item_name: String,
 }
@@ -69,7 +69,7 @@ impl EditPlan {
                 let end = Boundary::new(Target::Line(line_end), BoundaryMode::Exclude);
                 let snippet = Snippet::Between { start, end };
 
-                let replacement = format!("\n{}\n\n", edit.doc_comment.trim());
+                let replacement = format!("\n{}\n\n", edit.section_content.trim());
 
                 let patch = Patch {
                     file: file_name.clone(),

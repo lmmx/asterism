@@ -177,7 +177,7 @@ pub fn extract_sections<F: Format>(file_path: &Path, format: &F) -> io::Result<V
             file_path: file_path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: Vec::new(),
-            doc_comment: None,
+            section_content: None,
             chunk_type: None,
             lhs_content: None,
             rhs_content: None,

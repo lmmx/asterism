@@ -23,7 +23,7 @@ fn test_section_move_up() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: vec![1],
-            doc_comment: None,
+            section_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -37,7 +37,7 @@ fn test_section_move_up() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(0),
             children_indices: vec![2],
-            doc_comment: None,
+            section_content: None,
         },
         Section {
             title: "Three".to_string(),
@@ -51,7 +51,7 @@ fn test_section_move_up() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(1),
             children_indices: vec![],
-            doc_comment: None,
+            section_content: None,
         },
     ];
 
@@ -87,7 +87,7 @@ fn test_section_move_level() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: vec![1],
-            doc_comment: None,
+            section_content: None,
         },
         Section {
             title: "Two".to_string(),
@@ -101,7 +101,7 @@ fn test_section_move_level() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(0),
             children_indices: vec![],
-            doc_comment: None,
+            section_content: None,
         },
     ];
 

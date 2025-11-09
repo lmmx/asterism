@@ -31,7 +31,7 @@ pub struct Section {
     /// Indices of directly nested subsections.
     pub children_indices: Vec<usize>,
     /// Edited content for this section (if modified)
-    pub doc_comment: Option<Vec<String>>,
+    pub section_content: Option<Vec<String>>,
     /// The chunk type (for diffs)
     pub chunk_type: Option<ChunkType>,
     /// The LHS (for diffs)

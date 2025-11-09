@@ -290,7 +290,7 @@ impl AppState {
                 edit.file_name, edit.line_start, edit.column_start
             );
             let lines: Vec<String> = edit
-                .doc_comment
+                .section_content
                 .lines()
                 .map(std::string::ToString::to_string)
                 .collect();
@@ -320,8 +320,8 @@ impl AppState {
         let mut edits = Vec::new();
 
         for section in &self.sections {
-            if let Some(ref doc_lines) = section.doc_comment {
-                let doc_comment = doc_lines.join("\n");
+            if let Some(ref doc_lines) = section.section_content {
+                let section_content = doc_lines.join("\n");
 
                 edits.push(Edit {
                     file_name: section.file_path.clone(),
@@ -329,7 +329,7 @@ impl AppState {
                     line_end: section.line_end,
                     column_start: section.column_start,
                     column_end: section.column_end,
-                    doc_comment,
+                    section_content,
                     item_name: section.title.clone(),
                 });
             }
@@ -405,7 +405,7 @@ impl AppState {
                         .iter_row()
                         .map(|line| line.iter().collect::<String>())
                         .collect();
-                    self.sections[section_idx].doc_comment = Some(lines);
+                    self.sections[section_idx].section_content = Some(lines);
                 }
             }
         }
@@ -433,7 +433,7 @@ impl AppState {
             return Ok(());
         };
 
-        self.sections[section_idx].doc_comment = Some(editor_lines.clone());
+        self.sections[section_idx].section_content = Some(editor_lines.clone());
 
         let section = &self.sections[section_idx];
 
@@ -447,7 +447,7 @@ impl AppState {
             line_end: section.line_end,
             column_start: section.column_start,
             column_end: section.column_end,
-            doc_comment: padded_content,
+            section_content: padded_content,
             item_name: section.title.clone(),
         };
 

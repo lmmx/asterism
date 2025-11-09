@@ -16,7 +16,7 @@ fn test_single_line_replacement() {
         line_end: 2,
         column_start: 1,
         column_end: 7,
-        doc_comment: "Modified".to_string(), // No padding
+        section_content: "Modified".to_string(), // No padding
         item_name: "test".to_string(),
     };
 
@@ -44,7 +44,7 @@ fn test_section_replacement_with_empty_lines() {
         line_end: 5,
         column_start: 1,
         column_end: 2,
-        doc_comment: "Yeah".to_string(),
+        section_content: "Yeah".to_string(),
         item_name: "Hello".to_string(),
     };
 
@@ -81,7 +81,7 @@ fn test_boundary_mode_exclude() {
         line_end: 2, // Exclude line 2 (C)
         column_start: 1,
         column_end: 2,
-        doc_comment: "REPLACED".to_string(), // No padding
+        section_content: "REPLACED".to_string(), // No padding
         item_name: "test".to_string(),
     };
 
@@ -115,7 +115,7 @@ fn test_line_numbering_off_by_one() {
         line_end: 3,
         column_start: 1,
         column_end: 7,
-        doc_comment: "SECOND".to_string(),
+        section_content: "SECOND".to_string(),
         item_name: "test".to_string(),
     };
 
@@ -202,7 +202,7 @@ fn test_line_indexing_zero_vs_one() {
         line_end: 1,   // Exclusive: should stop before "Line 1"
         column_start: 1,
         column_end: 7,
-        doc_comment: "ZERO".to_string(),
+        section_content: "ZERO".to_string(),
         item_name: "test".to_string(),
     };
 
@@ -223,7 +223,7 @@ fn test_line_indexing_zero_vs_one() {
         line_end: 2,
         column_start: 1,
         column_end: 7,
-        doc_comment: "ONE".to_string(),
+        section_content: "ONE".to_string(),
         item_name: "test".to_string(),
     };
 
@@ -263,7 +263,7 @@ fn test_app_section_to_textum_conversion() {
         line_end: sections[0].line_end,
         column_start: sections[0].column_start,
         column_end: sections[0].column_end,
-        doc_comment: "Yeah".to_string(),
+        section_content: "Yeah".to_string(),
         item_name: "Hello".to_string(),
     };
 
@@ -331,7 +331,7 @@ fn test_exact_scenario() {
         line_end: (sec.line_end - 1).max(0) as i64,
         column_start: sec.column_start,
         column_end: sec.column_end,
-        doc_comment: "Yeah".to_string(),
+        section_content: "Yeah".to_string(),
         item_name: "Hello".to_string(),
     };
 
@@ -398,7 +398,7 @@ fn test_diagnose_line_numbers() {
         line_end: sec.line_end,
         column_start: sec.column_start,
         column_end: sec.column_end,
-        doc_comment: "Yeah".to_string(),
+        section_content: "Yeah".to_string(),
         item_name: "Hello".to_string(),
     };
 
@@ -444,7 +444,7 @@ fn test_textum_line_behavior() {
         line_end: 2,   // Exclude line 2 (Line2)
         column_start: 0,
         column_end: 0,
-        doc_comment: "REPLACED".to_string(),
+        section_content: "REPLACED".to_string(),
         item_name: "test".to_string(),
     };
 
