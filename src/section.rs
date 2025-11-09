@@ -30,4 +30,6 @@ pub struct Section {
     pub parent_index: Option<usize>,
     /// Indices of directly nested subsections.
     pub children_indices: Vec<usize>,
+    /// Edited content for this section (if modified)
+    pub doc_comment: Option<Vec<String>>,
 }

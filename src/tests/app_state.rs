@@ -25,6 +25,7 @@ fn test_edit_persists_correctly() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: vec![1],
+            doc_comment: None,
         },
         Section {
             title: "World".to_string(),
@@ -38,6 +39,7 @@ fn test_edit_persists_correctly() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(0),
             children_indices: vec![],
+            doc_comment: None,
         },
     ];
 
@@ -75,8 +77,8 @@ fn test_edit_plan_captures_changes() {
     let sections = vec![Section {
         title: "Test".to_string(),
         level: 1,
-        line_start: 3,
-        line_end: 4,
+        line_start: 2,
+        line_end: 3,
         column_start: 1,
         column_end: 7,
         byte_start: 9,
@@ -84,6 +86,7 @@ fn test_edit_plan_captures_changes() {
         file_path: path.to_string_lossy().to_string(),
         parent_index: None,
         children_indices: vec![],
+        doc_comment: None,
     }];
 
     let mut app = AppState::new(vec![path.clone()], sections, 100);
@@ -105,7 +108,7 @@ fn test_edit_plan_captures_changes() {
         !plan.edits.is_empty(),
         "Edit plan should contain the saved edit"
     );
-    assert_eq!(plan.edits[0].doc_comment, "Modified");
+    assert_eq!(plan.edits[0].doc_comment, "\nModified\n");
 }
 
 #[test]
@@ -127,6 +130,7 @@ fn test_multiple_edits_correct_offsets() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: None,
             children_indices: vec![1],
+            doc_comment: None,
         },
         Section {
             title: "Two".to_string(),
@@ -140,6 +144,7 @@ fn test_multiple_edits_correct_offsets() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(0),
             children_indices: vec![2],
+            doc_comment: None,
         },
         Section {
             title: "Three".to_string(),
@@ -153,6 +158,7 @@ fn test_multiple_edits_correct_offsets() {
             file_path: path.to_string_lossy().to_string(),
             parent_index: Some(1),
             children_indices: vec![],
+            doc_comment: None,
         },
     ];
 

@@ -179,26 +179,21 @@ impl AppState {
     pub fn generate_edit_plan(&self) -> EditPlan {
         let mut edits = Vec::new();
 
-        // Generate edits from modified sections
-        if let Some(ref editor_state) = self.editor_state {
-            let section = &self.sections[self.current_section_index];
-            let lines: Vec<String> = editor_state
-                .lines
-                .iter_row()
-                .map(|line| line.iter().collect::<String>())
-                .collect();
+        // Generate edits from ALL modified sections
+        for section in &self.sections {
+            if let Some(ref doc_lines) = section.doc_comment {
+                let doc_comment = doc_lines.join("\n");
 
-            let doc_comment = lines.join("\n");
-
-            edits.push(Edit {
-                file_name: section.file_path.clone(),
-                line_start: section.line_start,
-                line_end: section.line_end,
-                column_start: section.column_start,
-                column_end: section.column_end,
-                doc_comment,
-                item_name: section.title.clone(),
-            });
+                edits.push(Edit {
+                    file_name: section.file_path.clone(),
+                    line_start: section.line_start,
+                    line_end: section.line_end,
+                    column_start: section.column_start,
+                    column_end: section.column_end,
+                    doc_comment,
+                    item_name: section.title.clone(),
+                });
+            }
         }
 
         EditPlan { edits }
@@ -241,7 +236,15 @@ impl AppState {
     /// Clears editor state and transitions view without saving unless explicitly requested.
     pub fn exit_detail_view(&mut self, save: bool) {
         if save {
-            // Content is saved via save_current
+            // Extract text from editor and store in section
+            if let Some(ref editor_state) = self.editor_state {
+                let lines = editor_state
+                    .lines
+                    .iter_row()
+                    .map(|line| line.iter().collect::<String>())
+                    .collect();
+                self.sections[self.current_section_index].doc_comment = Some(lines);
+            }
         }
         self.editor_state = None;
         self.current_view = View::List;
@@ -256,8 +259,7 @@ impl AppState {
     ///
     /// Returns an error if file operations fail.
     pub fn save_current(&mut self) -> io::Result<()> {
-        let section = &self.sections[self.current_section_index];
-
+        // Extract editor lines first, before any borrows
         let editor_lines = if let Some(ref editor_state) = self.editor_state {
             editor_state
                 .lines
@@ -267,6 +269,12 @@ impl AppState {
         } else {
             return Ok(());
         };
+
+        // Store in section for edit plan generation
+        self.sections[self.current_section_index].doc_comment = Some(editor_lines.clone());
+
+        // Now borrow section data
+        let section = &self.sections[self.current_section_index];
 
         // Join lines and strip leading/trailing whitespace
         let raw_content = editor_lines.join("\n");
