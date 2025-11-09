@@ -34,7 +34,7 @@ impl Format for MarkdownFormat {
         let colors = [
             Color::Cyan,
             Color::Green,
-            Color::Yellow,
+            Color::LightYellow,
             Color::Magenta,
             Color::Blue,
             Color::Red,

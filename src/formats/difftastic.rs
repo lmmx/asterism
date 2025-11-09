@@ -123,7 +123,7 @@ impl Format for DifftasticFormat {
         let color = if level == 0 {
             Color::Cyan // Files
         } else {
-            Color::Yellow // Hunks
+            Color::LightYellow // Hunks
         };
 
         let spans = vec![
@@ -163,7 +163,7 @@ impl DifftasticFormat {
                 }
             }
         }
-        Color::Yellow // Modification
+        Color::LightYellow // Modification
     }
 }
 
