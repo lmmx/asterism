@@ -298,7 +298,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                     KeyCode::Enter => {
                         let cmd = app.command_buffer.clone();
-                        app.current_view = app_state::View::Detail;
+                        app.current_view = app_state::View::List; // Always return to List view
 
                         match cmd.as_str() {
                             "w" => {
@@ -306,40 +306,66 @@ fn run_app<B: ratatui::backend::Backend>(
                                     if let Err(e) = app.save_section_reorder() {
                                         app.message = Some(format!("Error saving: {e}"));
                                     }
-                                } else if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
+                                } else if app.editor_state.is_some() {
+                                    // Only save current section if we're in the editor
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else {
+                                    app.message = Some("Nothing to save".to_string());
                                 }
                             }
                             "x" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else {
-                                    app.exit_detail_view(true);
+                                if app.move_state == app_state::MoveState::Moved {
+                                    if let Err(e) = app.save_section_reorder() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    }
+                                } else if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else {
+                                        app.exit_detail_view(true);
+                                    }
                                 }
                             }
                             "q" | "q!" => {
-                                app.exit_detail_view(false);
+                                if app.editor_state.is_some() {
+                                    app.exit_detail_view(false);
+                                } else if app.move_state != app_state::MoveState::None {
+                                    app.cancel_move();
+                                } else {
+                                    // Quit application logic
+                                    if app.file_mode == app_state::FileMode::Multi {
+                                        app.current_view = app_state::View::FileList;
+                                    } else {
+                                        return Ok(());
+                                    }
+                                }
                             }
                             "wn" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else if let Some(next) = app.find_next_section() {
-                                    app.exit_detail_view(true);
-                                    app.current_section_index = next;
-                                    app.enter_detail_view();
-                                } else {
-                                    app.message = Some("No more sections".to_string());
+                                if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else if let Some(next) = app.find_next_section() {
+                                        app.exit_detail_view(true);
+                                        app.current_section_index = next;
+                                        app.enter_detail_view();
+                                    } else {
+                                        app.message = Some("No more sections".to_string());
+                                    }
                                 }
                             }
                             "wp" => {
-                                if let Err(e) = app.save_current() {
-                                    app.message = Some(format!("Error saving: {e}"));
-                                } else if let Some(prev) = app.find_prev_section() {
-                                    app.exit_detail_view(true);
-                                    app.current_section_index = prev;
-                                    app.enter_detail_view();
-                                } else {
-                                    app.message = Some("No previous sections".to_string());
+                                if app.editor_state.is_some() {
+                                    if let Err(e) = app.save_current() {
+                                        app.message = Some(format!("Error saving: {e}"));
+                                    } else if let Some(prev) = app.find_prev_section() {
+                                        app.exit_detail_view(true);
+                                        app.current_section_index = prev;
+                                        app.enter_detail_view();
+                                    } else {
+                                        app.message = Some("No previous sections".to_string());
+                                    }
                                 }
                             }
                             _ => {
@@ -349,7 +375,7 @@ fn run_app<B: ratatui::backend::Backend>(
                         app.command_buffer.clear();
                     }
                     KeyCode::Esc => {
-                        app.current_view = app_state::View::Detail;
+                        app.current_view = app_state::View::List; // Return to List view, not Detail
                         app.command_buffer.clear();
                     }
                     _ => {}
