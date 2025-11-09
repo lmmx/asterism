@@ -32,6 +32,20 @@ pub struct Section {
     pub children_indices: Vec<usize>,
     /// Edited content for this section (if modified)
     pub doc_comment: Option<Vec<String>>,
+    /// The chunk type (for diffs)
+    pub chunk_type: Option<ChunkType>,
+    /// The LHS (for diffs)
+    pub lhs_content: Option<String>,
+    /// The RHS (for diffs)
+    pub rhs_content: Option<String>,
+}
+
+#[derive(Clone)]
+pub enum ChunkType {
+    Added,      // Only rhs exists
+    Deleted,    // Only lhs exists
+    Modified,   // Both exist and differ
+    Unchanged,  // Both exist and are the same
 }
 
 #[derive(Clone)]

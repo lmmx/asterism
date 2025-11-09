@@ -4,14 +4,16 @@
 //! converting it into sections that can be navigated and edited in asterism.
 
 use crate::formats::Format;
-use crate::section::Section;
+use crate::section::{Section, ChunkType};
 use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fmt::Write;
-use std::io;
+use std::{fs, io};
+use std::path::Path;
 
 /// Represents a file in difftastic output
 #[derive(Debug, Serialize, Deserialize)]
@@ -322,6 +324,120 @@ fn format_hunk_content(chunk: &[DifftLine]) -> String {
     }
 
     output
+}
+
+pub fn extract_difftastic_sections(json_path: &Path) -> io::Result<Vec<Section>> {
+    let content = fs::read_to_string(json_path)?;
+    let lines: Vec<Value> = content
+        .lines()
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .collect();
+
+    let mut sections = Vec::new();
+
+    for value in lines {
+        if let Some(chunks) = value.get("chunks").and_then(|c| c.as_array()) {
+            let file_path = value.get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or("unknown");
+            let status = value.get("status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("unknown");
+
+            // For created files, create a single section for the whole file
+            if status == "created" {
+                sections.push(Section {
+                    title: format!("{} (created)", file_path),
+                    level: 1,
+                    // ... other fields ...
+                    chunk_type: Some(ChunkType::Added),
+                    lhs_content: None,
+                    rhs_content: Some(/* load file content */),
+                });
+                continue;
+            }
+
+            // Process each chunk array (there may be multiple hunk groups)
+            for (hunk_idx, chunk_array) in chunks.iter().enumerate() {
+                if let Some(chunk_list) = chunk_array.as_array() {
+                    // Each item in chunk_list is a separate chunk
+                    for (chunk_idx, chunk) in chunk_list.iter().enumerate() {
+                        let lhs = chunk.get("lhs");
+                        let rhs = chunk.get("rhs");
+
+                        let chunk_type = match (lhs, rhs) {
+                            (Some(_), None) => ChunkType::Deleted,
+                            (None, Some(_)) => ChunkType::Added,
+                            (Some(l), Some(r)) if l != r => ChunkType::Modified,
+                            (Some(_), Some(_)) => ChunkType::Unchanged,
+                            _ => continue,
+                        };
+
+                        let line_num = lhs
+                            .or(rhs)
+                            .and_then(|v| v.get("line_number"))
+                            .and_then(|n| n.as_i64())
+                            .unwrap_or(0);
+
+                        let title = format!(
+                            "Chunk @@ {}:{} @@",
+                            file_path,
+                            line_num
+                        );
+
+                        // Extract content from changes arrays
+                        let lhs_text = lhs.and_then(|l| extract_chunk_text(l));
+                        let rhs_text = rhs.and_then(|r| extract_chunk_text(r));
+
+                        sections.push(Section {
+                            title,
+                            level: 2,
+                            line_start: line_num,
+                            line_end: line_num + 1,
+                            column_start: lhs
+                                .or(rhs)
+                                .and_then(|v| v.get("changes"))
+                                .and_then(|c| c.as_array())
+                                .and_then(|arr| arr.first())
+                                .and_then(|first| first.get("start"))
+                                .and_then(|s| s.as_i64())
+                                .unwrap_or(0),
+                            column_end: lhs
+                                .or(rhs)
+                                .and_then(|v| v.get("changes"))
+                                .and_then(|c| c.as_array())
+                                .and_then(|arr| arr.last())
+                                .and_then(|last| last.get("end"))
+                                .and_then(|e| e.as_i64())
+                                .unwrap_or(0),
+                            byte_start: 0,
+                            byte_end: 0,
+                            file_path: file_path.to_string(),
+                            parent_index: None,
+                            children_indices: Vec::new(),
+                            chunk_type: Some(chunk_type),
+                            lhs_content: lhs_text,
+                            rhs_content: rhs_text,
+                            doc_comment: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(sections)
+}
+
+fn extract_chunk_text(side: &Value) -> Option<String> {
+    side.get("changes")
+        .and_then(|c| c.as_array())
+        .map(|changes| {
+            changes
+                .iter()
+                .filter_map(|change| change.get("content").and_then(|c| c.as_str()))
+                .collect::<String>()
+        })
 }
 
 #[cfg(test)]
