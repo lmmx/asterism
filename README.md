@@ -49,14 +49,6 @@ Edit a specific file:
 asterism README.md
 ```
 
-## Configuration
-
-Create an `asterism.toml` file in your project directory:
-```toml
-wrap_width = 100
-file_extensions = ["md", "markdown"]
-```
-
 ## Keybindings
 
 ### List View
@@ -70,6 +62,7 @@ file_extensions = ["md", "markdown"]
 - <kbd>q</kbd>: Quit (or return to file list in multi-file mode)
 
 ### Editor View
+
 - <kbd>:w</kbd>: Save
 - <kbd>:x</kbd>: Save and exit
 - <kbd>:q</kbd>: Quit (warns if unsaved)
@@ -78,6 +71,15 @@ file_extensions = ["md", "markdown"]
 - <kbd>:wp</kbd>: Save and go to previous section
 - Standard vim editing commands
 
+## Configuration
+
+Create an `asterism.toml` file in your project directory:
+```toml
+wrap_width = 100
+file_extensions = ["md", "markdown"]
+```
+
 ## Licensing
 
 Asterism is [MIT licensed](https://github.com/lmmx/asterism/blob/master/LICENSE), a permissive open source license.
+
