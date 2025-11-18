@@ -124,7 +124,11 @@ fn test_section_move_level() {
 #[test]
 fn test_section_reorder_and_save() {
     let mut file = NamedTempFile::new().unwrap();
-    writeln!(file, "# Alpha\n\nContent A\n\n## Beta\n\nContent B\n\n### Gamma\n\nContent C").unwrap();
+    writeln!(
+        file,
+        "# Alpha\n\nContent A\n\n## Beta\n\nContent B\n\n### Gamma\n\nContent C"
+    )
+    .unwrap();
     file.flush().unwrap();
     let path = file.path().to_path_buf();
 
@@ -165,7 +169,10 @@ fn test_section_reorder_and_save() {
     assert!(lines.iter().any(|l| l.starts_with("## Beta")));
 
     // Verify order in file
-    let gamma_pos = lines.iter().position(|l| l.starts_with("### Gamma")).unwrap();
+    let gamma_pos = lines
+        .iter()
+        .position(|l| l.starts_with("### Gamma"))
+        .unwrap();
     let alpha_pos = lines.iter().position(|l| l.starts_with("# Alpha")).unwrap();
     let beta_pos = lines.iter().position(|l| l.starts_with("## Beta")).unwrap();
 
@@ -197,7 +204,10 @@ fn test_section_level_change_and_save() {
     let content = fs::read_to_string(&path).unwrap();
     println!("File content:\n{}", content);
 
-    assert!(content.contains("# Subtitle"), "Should be level 1 heading now");
+    assert!(
+        content.contains("# Subtitle"),
+        "Should be level 1 heading now"
+    );
 }
 
 #[test]

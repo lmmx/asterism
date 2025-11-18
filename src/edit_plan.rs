@@ -8,15 +8,15 @@ use std::collections::HashMap;
 use std::io;
 use textum::{Boundary, BoundaryMode, Patch, PatchSet, Snippet, Target};
 
-#[derive(Serialize, Deserialize, Clone)]
 /// Serialisable collection of file modifications for atomic application.
+#[derive(Serialize, Deserialize, Clone)]
 pub struct EditPlan {
     /// Individual section replacements grouped for batch processing.
     pub edits: Vec<Edit>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
 /// Precise coordinates and content for replacing a section in a file.
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Edit {
     /// Target file path for this modification.
     pub file_name: String,

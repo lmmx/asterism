@@ -40,8 +40,8 @@ pub struct Section {
     pub rhs_content: Option<String>,
 }
 
-#[derive(Clone)]
 /// What sort of hunk (syntactic diff atomic unit) it is.
+#[derive(Clone)]
 pub enum ChunkType {
     /// Only RHS exists
     Added,
@@ -53,8 +53,8 @@ pub enum ChunkType {
     Unchanged,
 }
 
-#[derive(Clone)]
 /// Types of nodes that can appear in the file tree view.
+#[derive(Clone)]
 pub enum NodeType {
     /// Directory node showing a path component
     Directory {
@@ -74,8 +74,8 @@ pub enum NodeType {
     Section(Section),
 }
 
-#[derive(Clone)]
 /// A node in the unified file + section tree.
+#[derive(Clone)]
 pub struct TreeNode {
     /// The type of node (directory, file, or section)
     pub node_type: NodeType,

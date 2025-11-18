@@ -32,11 +32,11 @@ pub struct DifftFile {
 /// Represents a line in a diff chunk
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DifftLine {
-    #[serde(skip_serializing_if = "Option::is_none")]
     /// Left-hand (original) side of the comparison, absent for pure additions.
-    pub lhs: Option<DifftSide>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub lhs: Option<DifftSide>,
     /// Right-hand (modified) side of the comparison, absent for pure deletions.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rhs: Option<DifftSide>,
 }
 

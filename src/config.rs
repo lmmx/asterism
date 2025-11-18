@@ -6,11 +6,11 @@
 use facet::Facet;
 use std::fs;
 
-#[derive(Facet, Clone)]
 /// User preferences loaded from asterism.toml or falling back to defaults.
+#[derive(Facet, Clone)]
 pub struct Config {
-    #[facet(default = 100)]
     /// Maximum line width for editor text wrapping.
+    #[facet(default = 100)]
     pub wrap_width: usize,
     #[facet(default = vec!["md".to_string()])]
     /// File suffixes to match when scanning directories.
@@ -18,12 +18,12 @@ pub struct Config {
 }
 
 impl Config {
-    #[must_use]
     /// Load configuration from asterism.toml if present.
     ///
     /// # Panics
     ///
     /// Panics if the default configuration cannot be parsed.
+    #[must_use]
     pub fn load() -> Self {
         if let Ok(contents) = fs::read_to_string("asterism.toml") {
             if let Ok(config) = facet_toml::from_str::<Self>(&contents) {

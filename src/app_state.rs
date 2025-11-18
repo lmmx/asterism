@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{fs, io};
 
-#[derive(PartialEq)]
 /// Determines navigation scope and quit behavior based on project size.
+#[derive(PartialEq)]
 pub enum FileMode {
     /// Single-file mode quits directly to shell.
     Single,
@@ -24,8 +24,8 @@ pub enum FileMode {
     Multi,
 }
 
-#[derive(Clone, PartialEq, Debug)]
 /// Tracks the lifecycle of a section reordering operation.
+#[derive(Clone, PartialEq, Debug)]
 pub enum MoveState {
     /// No section is being moved; normal navigation mode.
     None,
@@ -65,8 +65,8 @@ pub struct AppState {
     pub moving_section_index: Option<usize>,
 }
 
-#[derive(PartialEq)]
 /// Determines which UI screen renders and how input is interpreted.
+#[derive(PartialEq)]
 pub enum View {
     /// Shows hierarchical section tree with navigation.
     List,
@@ -77,8 +77,8 @@ pub enum View {
 }
 
 impl AppState {
-    #[must_use]
     /// Initialises application state with parsed sections and determines file mode.
+    #[must_use]
     pub fn new(files: Vec<PathBuf>, sections: Vec<Section>, wrap_width: usize) -> Self {
         let file_mode = if files.len() == 1 {
             FileMode::Single
@@ -267,8 +267,8 @@ impl AppState {
         }
     }
 
-    #[must_use]
     /// Calculates total lines added before a section to determine correct write position.
+    #[must_use]
     pub fn cumulative_offset(&self, index: usize) -> usize {
         let section = &self.sections[index];
         let target_file = &section.file_path;
@@ -318,8 +318,8 @@ impl AppState {
         }
     }
 
-    #[must_use]
     /// Creates a serialisable plan capturing current editor modifications.
+    #[must_use]
     pub fn generate_edit_plan(&self) -> EditPlan {
         let mut edits = Vec::new();
 
@@ -513,8 +513,8 @@ impl AppState {
             .find(|&i| self.tree_nodes[i].navigable)
     }
 
-    #[must_use]
     /// Moves to the containing section in the document hierarchy.
+    #[must_use]
     pub fn navigate_to_parent(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let parent_section_idx = self.sections[section_idx].parent_index?;
@@ -525,8 +525,8 @@ impl AppState {
             .position(|n| n.section_index == Some(parent_section_idx))
     }
 
-    #[must_use]
     /// Descends to the first child section in the document hierarchy.
+    #[must_use]
     pub fn navigate_to_first_child(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let first_child_idx = self.sections[section_idx].children_indices.first()?;
@@ -536,8 +536,8 @@ impl AppState {
             .position(|n| n.section_index == Some(*first_child_idx))
     }
 
-    #[must_use]
     /// Finds the next descendant section at any depth in the hierarchy.
+    #[must_use]
     pub fn navigate_to_next_descendant(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
 
@@ -562,8 +562,8 @@ impl AppState {
         None
     }
 
-    #[must_use]
     /// Finds the next section at the same hierarchy level.
+    #[must_use]
     pub fn navigate_to_next_sibling(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let current_level = self.sections[section_idx].level;
@@ -583,8 +583,8 @@ impl AppState {
         None
     }
 
-    #[must_use]
     /// Finds the previous section at the same hierarchy level.
+    #[must_use]
     pub fn navigate_to_prev_sibling(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let current_level = self.sections[section_idx].level;
@@ -604,20 +604,20 @@ impl AppState {
         None
     }
 
-    #[must_use]
     /// Jumps to the first navigable node.
+    #[must_use]
     pub fn navigate_to_first(&self) -> Option<usize> {
         self.tree_nodes.iter().position(|n| n.navigable)
     }
 
-    #[must_use]
     /// Jumps to the last navigable node.
+    #[must_use]
     pub fn navigate_to_last(&self) -> Option<usize> {
         self.tree_nodes.iter().rposition(|n| n.navigable)
     }
 
-    #[must_use]
     /// Finds the first section at the same hierarchy level.
+    #[must_use]
     pub fn navigate_to_first_at_level(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let current_level = self.sections[section_idx].level;
@@ -634,8 +634,8 @@ impl AppState {
         None
     }
 
-    #[must_use]
     /// Finds the last section at the same hierarchy level.
+    #[must_use]
     pub fn navigate_to_last_at_level(&self) -> Option<usize> {
         let section_idx = self.get_current_section_index()?;
         let current_level = self.sections[section_idx].level;
@@ -652,8 +652,8 @@ impl AppState {
         None
     }
 
-    #[must_use]
     /// Calculates indentation width based on section nesting level.
+    #[must_use]
     pub fn get_indent(&self) -> usize {
         if let Some(section) = self.get_current_section() {
             section.level * 2
@@ -662,8 +662,8 @@ impl AppState {
         }
     }
 
-    #[must_use]
     /// Determines available width for text after accounting for indentation.
+    #[must_use]
     pub fn get_max_line_width(&self) -> usize {
         let indent = self.get_indent();
         self.wrap_width.saturating_sub(indent)
